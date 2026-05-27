@@ -1,7 +1,7 @@
 "use client";
 
 import { Canvas, useThree, type ThreeEvent } from "@react-three/fiber";
-import { OrbitControls } from "@react-three/drei";
+import { OrbitControls, Html } from "@react-three/drei";
 import { Suspense, useMemo, useRef, useEffect } from "react";
 import * as THREE from "three";
 import type {
@@ -157,6 +157,19 @@ function FacePlane({
         <edgesGeometry args={[new THREE.PlaneGeometry(face.width, face.height)]} />
         <lineBasicMaterial color="#8b5a2b" linewidth={1} transparent opacity={0.45} />
       </lineSegments>
+
+      {/* Face label — small chip floating at the face center, always camera-facing */}
+      <Html
+        position={[0, 0, 0.05]}
+        center
+        distanceFactor={8}
+        zIndexRange={[0, 10]}
+        pointerEvents="none"
+      >
+        <div className="px-2 py-0.5 rounded bg-neutral-950/80 text-amber-400 text-[10px] font-bold uppercase tracking-widest border border-amber-500/30 whitespace-nowrap select-none">
+          {face.id}
+        </div>
+      </Html>
 
       {/* Knot markers */}
       {mineKnots.map((k) => {

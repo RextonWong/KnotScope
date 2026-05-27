@@ -15,10 +15,31 @@ interface SurfaceGalleryProps {
   onSelectKnot?: (sel: { surface: SurfaceId; id: number } | null) => void;
 }
 
-const PAIR_ROWS: { a: SurfaceId; b: SurfaceId; pairAxis: string }[] = [
-  { a: "front", b: "back", pairAxis: "thickness" },
-  { a: "top", b: "bottom", pairAxis: "width" },
-  { a: "left", b: "right", pairAxis: "length" },
+// Each row is scaled by `widthFraction` of the gallery width — broad faces get
+// 100%, edges shrink to match how much smaller they are than the broad face on
+// the actual plank. Capped to a sensible min so very thin edges stay legible.
+const PAIR_ROWS: {
+  a: SurfaceId;
+  b: SurfaceId;
+  pairAxis: string;
+  // Returns a 0–1 width fraction for this row based on plank dimensions.
+  widthFraction: (d: PlankDimensions) => number;
+}[] = [
+  {
+    a: "front", b: "back", pairAxis: "thickness",
+    widthFraction: () => 1.0,
+  },
+  {
+    a: "top", b: "bottom", pairAxis: "width",
+    // Top/bottom share the long axis with front/back, so they're the same width
+    widthFraction: () => 1.0,
+  },
+  {
+    a: "left", b: "right", pairAxis: "length",
+    // Left/right are sized by the plank's width (short axis), shown smaller
+    // and centered. Floor at 35% so they stay readable.
+    widthFraction: (d) => Math.max(0.35, Math.min(0.7, d.width_mm / d.length_mm * 2.5)),
+  },
 ];
 
 const KNOT_COLORS: Record<Knot["type"], string> = {
@@ -119,38 +140,45 @@ export function SurfaceGallery({
         })}
       </svg>
 
-      {PAIR_ROWS.map((row) => (
-        <div key={`${row.a}-${row.b}`} className="flex flex-col gap-2">
-          <div className="flex items-center gap-2">
-            <span className="text-xs uppercase tracking-wider text-neutral-500">
-              Through-knot axis: <span className="text-amber-400">{row.pairAxis}</span>
-            </span>
-            <span className="text-[10px] text-neutral-700">
-              ({row.a} ↔ {row.b} — opposite faces)
-            </span>
+      {PAIR_ROWS.map((row) => {
+        const widthPct = Math.round(row.widthFraction(dimensions) * 100);
+        return (
+          <div
+            key={`${row.a}-${row.b}`}
+            className="flex flex-col gap-2 mx-auto w-full"
+            style={{ maxWidth: `${widthPct}%` }}
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-xs uppercase tracking-wider text-neutral-500">
+                Through-knot axis: <span className="text-amber-400">{row.pairAxis}</span>
+              </span>
+              <span className="text-[10px] text-neutral-700">
+                ({row.a} ↔ {row.b} — opposite faces)
+              </span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <SurfaceTile
+                surface={row.a}
+                dimensions={dimensions}
+                image={surfaceImages[row.a]}
+                knots={analysis?.surfaces[row.a]}
+                selectedKnot={selectedKnot ?? null}
+                onSelectKnot={onSelectKnot}
+                tileRef={(el) => { tileRefs.current[row.a] = el; }}
+              />
+              <SurfaceTile
+                surface={row.b}
+                dimensions={dimensions}
+                image={surfaceImages[row.b]}
+                knots={analysis?.surfaces[row.b]}
+                selectedKnot={selectedKnot ?? null}
+                onSelectKnot={onSelectKnot}
+                tileRef={(el) => { tileRefs.current[row.b] = el; }}
+              />
+            </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <SurfaceTile
-              surface={row.a}
-              dimensions={dimensions}
-              image={surfaceImages[row.a]}
-              knots={analysis?.surfaces[row.a]}
-              selectedKnot={selectedKnot ?? null}
-              onSelectKnot={onSelectKnot}
-              tileRef={(el) => { tileRefs.current[row.a] = el; }}
-            />
-            <SurfaceTile
-              surface={row.b}
-              dimensions={dimensions}
-              image={surfaceImages[row.b]}
-              knots={analysis?.surfaces[row.b]}
-              selectedKnot={selectedKnot ?? null}
-              onSelectKnot={onSelectKnot}
-              tileRef={(el) => { tileRefs.current[row.b] = el; }}
-            />
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

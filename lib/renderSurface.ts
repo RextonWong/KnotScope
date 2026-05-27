@@ -184,80 +184,79 @@ function paintWood(
   const longAxisIsX = wPx >= hPx;
 
   const baseSeed = palette.seedSalt;
-  const nGrain = makeNoise(baseSeed * 1009);
   const nFine = makeNoise(baseSeed * 7919);
   const nWarp = makeNoise(baseSeed * 401);
+  const nWarp2 = makeNoise(baseSeed * 8893);
   const nColor = makeNoise(baseSeed * 137);
+  const nSpacing = makeNoise(baseSeed * 257);
 
   const shortAxisPx = Math.min(wPx, hPx);
-  // 7 ± 2 visible rings across the short axis — natural for boards
-  const ringCount = 7 + (baseSeed % 5);
-  const ringSpacingPx = shortAxisPx / ringCount;
+  // 6 ± 2 visible rings across the short axis — softer than before
+  const ringCount = 6 + (baseSeed % 4);
+  const baseSpacing = shortAxisPx / ringCount;
 
   const img = ctx.createImageData(wPx, hPx);
   const data = img.data;
 
-  // For end-grain surfaces (the short sawn ends), the rings form arcs around
-  // a slightly off-center pith point. Place the pith outside the visible
-  // area for plank-style "tangential" rings.
-  const pithCx = wPx * (0.5 - 0.6);
-  const pithCy = hPx * (0.5 + 0.3);
+  // End-grain pith placed off-canvas for tangential ring arcs
+  const pithCx = wPx * -0.15;
+  const pithCy = hPx * 1.05;
 
   for (let y = 0; y < hPx; y++) {
     for (let x = 0; x < wPx; x++) {
-      // Subtle warp so grain lines aren't dead-straight
-      const wx = fbm(nWarp, x / 90, y / 220, 3) * ringSpacingPx * 0.45;
-      const wy = fbm(nWarp, x / 220, y / 90, 3) * ringSpacingPx * 0.15;
+      // Two-scale warp — fast for local wobble, slow for sweeping curves.
+      // Amplitudes are generous (~70% of band spacing) so bands shift visibly.
+      const warpFast = fbm(nWarp, x / 60, y / 60, 4) * baseSpacing * 0.55;
+      const warpSlow = fbm(nWarp2, x / 260, y / 260, 2) * baseSpacing * 0.45;
+      const acrossWarp = warpFast + warpSlow;
+
+      // Spacing variation — some bands wider, some narrower, like real growth rings
+      const spacingVar = fbm(nSpacing, x / 200, y / 200, 2) * 0.40;
+      const localSpacing = baseSpacing * (1 + spacingVar);
 
       let bandPos: number;
       if (isEndGrain) {
-        const dxp = x - pithCx + wx;
-        const dyp = y - pithCy + wy;
-        const r = Math.sqrt(dxp * dxp + dyp * dyp);
-        bandPos = r / (ringSpacingPx * 0.85);
+        const dxp = x - pithCx;
+        const dyp = y - pithCy;
+        const r = Math.sqrt(dxp * dxp + dyp * dyp) + acrossWarp;
+        bandPos = r / (baseSpacing * 0.85 * (1 + spacingVar * 0.5));
       } else {
-        const acrossAxis = longAxisIsX ? y + wy : x + wx;
-        bandPos = acrossAxis / ringSpacingPx;
+        const acrossAxis = longAxisIsX ? y : x;
+        bandPos = (acrossAxis + acrossWarp) / localSpacing;
       }
 
-      // Phase within the current ring [0..1)
       const phase = bandPos - Math.floor(bandPos);
 
-      // Band profile: light early-wood for ~75% of the cycle, dark late-wood
-      // packed into the last ~25%. The dark region has a sharper falloff so
-      // it reads as a crisp growth-ring line.
+      // Soft band profile — Gaussian dark band for natural appearance
       let t: number;
-      if (phase < 0.78) {
-        // Gentle gradient from base ↑ to light ↑ then back ↓ to base
-        const p = phase / 0.78;
-        t = 0.40 + 0.30 * Math.sin(p * Math.PI);
+      if (phase < 0.80) {
+        // Light early-wood: gentle dome
+        const p = phase / 0.80;
+        t = 0.45 + 0.25 * Math.sin(p * Math.PI);
       } else {
-        // Dark late-wood
-        const p = (phase - 0.78) / 0.22; // 0..1
-        // Triangle, sharper toward middle of the dark stripe
-        const tri = 1 - Math.abs(p - 0.5) * 2;
-        t = 0.08 + 0.18 * (1 - Math.pow(tri, 0.6));
+        // Dark late-wood: soft Gaussian bell so edges aren't sharp
+        const p = (phase - 0.80) / 0.20;
+        const bell = Math.exp(-Math.pow((p - 0.5) * 2.4, 2));
+        t = 0.50 - 0.40 * bell;
       }
 
-      // Slow color variation — gives the board a non-uniform overall hue
-      const colorVar = fbm(nColor, x / 280, y / 280, 3) * 0.18;
+      // Slow color variation — gives the board non-uniform overall hue
+      const colorVar = fbm(nColor, x / 280, y / 280, 3) * 0.22;
       t = Math.max(0, Math.min(1, t + colorVar));
 
-      // Mix the palette
       let col: [number, number, number];
-      if (t < 0.38) {
-        col = mixRgb(palette.dark, palette.base, t / 0.38);
+      if (t < 0.40) {
+        col = mixRgb(palette.dark, palette.base, t / 0.40);
       } else if (t < 0.78) {
-        col = mixRgb(palette.base, palette.light, (t - 0.38) / 0.40);
+        col = mixRgb(palette.base, palette.light, (t - 0.40) / 0.38);
       } else {
-        // Past "max light" — pull back toward base so the brightest pixels
-        // don't blow out
+        // Past "max light" — pull back toward base so brightest pixels don't blow out
         col = mixRgb(palette.light, palette.base, (t - 0.78) / 0.22 * 0.4);
       }
 
-      // Subtle multiplicative noise so flat areas have texture
+      // Subtle multiplicative noise so flat areas still have texture
       const grit = fbm(nFine, x / 1.4, y / 1.4, 1);
-      const gritFac = 1 + grit * 0.06;
+      const gritFac = 1 + grit * 0.07;
       col[0] *= gritFac;
       col[1] *= gritFac;
       col[2] *= gritFac;
@@ -265,7 +264,7 @@ function paintWood(
       // Mild edge darkening so the board reads as a 3D object
       const vx = Math.min(x, wPx - x) / wPx;
       const vy = Math.min(y, hPx - y) / hPx;
-      const vig = 1 - Math.min(1, Math.min(vx, vy) * 12) * 0.04;
+      const vig = 1 - Math.min(1, Math.min(vx, vy) * 12) * 0.05;
       col[0] *= vig;
       col[1] *= vig;
       col[2] *= vig;
