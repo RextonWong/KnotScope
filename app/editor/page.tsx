@@ -9,12 +9,12 @@ import {
   Boxes,
   LayoutGrid,
   Layers,
-  Maximize,
   RotateCcw,
   Zap,
-  Eye,
   Pencil,
   Download,
+  ImageIcon,
+  ChevronLeft,
 } from "lucide-react";
 import type {
   EditableKnot,
@@ -32,7 +32,7 @@ import { LoadingState } from "@/components/LoadingState";
 import { KnotInspector } from "@/components/editor/KnotInspector";
 import { PlankSizePanel } from "@/components/editor/PlankSizePanel";
 import { SurfaceFlatEditor } from "@/components/editor/SurfaceFlatEditor";
-import { SurfaceUnfolded } from "@/components/editor/SurfaceUnfolded";
+import { SurfaceGallery } from "@/components/editor/SurfaceGallery";
 
 // R3F components — client-only to avoid SSR Three.js issues
 const Plank3D = dynamic(
@@ -49,7 +49,7 @@ const ResultPlank3D = dynamic(
 // and reasoning, all of which live on Analysis6.
 
 type EditMode = "3d" | "flat";
-type Phase = "edit" | "loading" | "results";
+type Phase = "edit" | "preview" | "loading" | "results";
 
 export default function EditorPage() {
   // ── Editor state ──────────────────────────────────────────────────────────
@@ -106,21 +106,35 @@ export default function EditorPage() {
     [knots, selectedKnotId]
   );
 
-  // ── Analyze ───────────────────────────────────────────────────────────────
-  const handleAnalyze = useCallback(async () => {
-    setPhase("loading");
-    setResultSelected(null);
+  // ── Step 1: render the 6 surfaces and show them in a preview ─────────────
+  const [generating, setGenerating] = useState(false);
+  const handleGenerate = useCallback(async () => {
+    setGenerating(true);
     try {
-      // Render all 6 surfaces in the browser
       const rendered = await renderAllSurfaces(dimensions, knots);
-      const payloadSurfaces = {} as Record<SurfaceId, { base64: string; mime: string }>;
       const imageState = {} as Record<SurfaceId, string>;
-      for (const s of SURFACE_IDS) {
-        payloadSurfaces[s] = { base64: rendered[s].base64, mime: rendered[s].mime };
-        imageState[s] = rendered[s].base64;
-      }
+      for (const s of SURFACE_IDS) imageState[s] = rendered[s].base64;
       setSurfaceImages(imageState);
+      setAnalysis(null);
+      setResultSelected(null);
+      setPhase("preview");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      toast.error(`Image generation failed: ${msg}`);
+    } finally {
+      setGenerating(false);
+    }
+  }, [dimensions, knots]);
 
+  // ── Step 2: send the previewed images to Gemini for analysis ─────────────
+  const handleAnalyze = useCallback(async () => {
+    if (!surfaceImages) return;
+    setPhase("loading");
+    try {
+      const payloadSurfaces = {} as Record<SurfaceId, { base64: string; mime: string }>;
+      for (const s of SURFACE_IDS) {
+        payloadSurfaces[s] = { base64: surfaceImages[s], mime: "image/jpeg" };
+      }
       const res = await fetch("/api/analyze6", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -135,7 +149,6 @@ export default function EditorPage() {
       setAnalysis(result);
       boardIdRef.current = `plank-${Date.now()}`;
       setPhase("results");
-
       const summary =
         result.total_knots === 0
           ? "No knots detected — clean plank."
@@ -144,11 +157,11 @@ export default function EditorPage() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error";
       toast.error(`Analysis failed: ${msg}`);
-      setPhase("edit");
+      setPhase("preview");
     }
-  }, [dimensions, knots]);
+  }, [dimensions, surfaceImages]);
 
-  const handleReset = () => {
+  const handleBackToEdit = () => {
     setPhase("edit");
     setResultSelected(null);
   };
@@ -205,6 +218,59 @@ export default function EditorPage() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {phase === "loading" && <LoadingState />}
+
+        {phase === "preview" && surfaceImages && (
+          <div className="flex flex-col gap-6">
+            <div className="flex flex-col sm:flex-row sm:items-end gap-3 sm:gap-6">
+              <div className="flex-1">
+                <h2 className="text-xl sm:text-2xl font-bold mb-1">Step 1 · Generated Surface Photos</h2>
+                <p className="text-neutral-500 text-sm">
+                  These six images were rendered from your editor. They&apos;re what gets sent to Gemini
+                  &mdash; the AI does <span className="text-amber-400">not</span> see your 3D model, only these photos.
+                </p>
+              </div>
+              <div className="text-xs text-neutral-600 sm:text-right">
+                <div>Plank: {dimensions.length_mm} × {dimensions.width_mm} × {dimensions.thickness_mm} mm</div>
+                <div>{knots.length} knot{knots.length !== 1 ? "s" : ""} placed</div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-neutral-800 bg-neutral-900 p-4 sm:p-5">
+              <SurfaceGallery
+                dimensions={dimensions}
+                surfaceImages={surfaceImages}
+              />
+            </div>
+
+            <div className="flex gap-3 flex-wrap">
+              <button
+                type="button"
+                onClick={handleAnalyze}
+                className="flex items-center gap-2 px-6 py-3 rounded-xl bg-amber-500 text-neutral-950 font-bold text-sm hover:bg-amber-400 active:scale-[0.98] transition-all min-h-[48px]"
+              >
+                <Zap size={16} />
+                Step 2 · Analyse with AI
+              </button>
+              <button
+                type="button"
+                onClick={handleBackToEdit}
+                className="flex items-center gap-2 px-5 py-3 rounded-xl border border-neutral-700 text-neutral-300 font-semibold hover:border-neutral-500 transition-colors min-h-[44px]"
+              >
+                <ChevronLeft size={16} />
+                Back to Editor
+              </button>
+              <button
+                type="button"
+                onClick={handleGenerate}
+                disabled={generating}
+                className="flex items-center gap-2 px-5 py-3 rounded-xl border border-neutral-800 text-neutral-400 font-semibold hover:border-neutral-600 hover:text-neutral-200 transition-colors min-h-[44px]"
+              >
+                <ImageIcon size={16} />
+                {generating ? "Regenerating…" : "Regenerate"}
+              </button>
+            </div>
+          </div>
+        )}
 
         {phase === "edit" && (
           <div className="flex flex-col xl:flex-row gap-4 xl:gap-6">
@@ -297,21 +363,21 @@ export default function EditorPage() {
                 )}
               </div>
 
-              {/* Analyze CTA */}
+              {/* Generate CTA — Step 1: render 6 wood images */}
               <div className="flex flex-wrap items-center gap-3">
                 <button
                   type="button"
-                  onClick={handleAnalyze}
-                  disabled={knots.length === 0}
+                  onClick={handleGenerate}
+                  disabled={knots.length === 0 || generating}
                   className="flex items-center gap-2 px-6 py-3 rounded-xl bg-amber-500 text-neutral-950 font-bold text-sm hover:bg-amber-400 active:scale-[0.98] transition-all disabled:opacity-30 disabled:cursor-not-allowed min-h-[48px]"
                 >
-                  <Zap size={16} />
-                  Analyze Plank
+                  <ImageIcon size={16} />
+                  {generating ? "Generating…" : "Generate Images"}
                 </button>
                 <p className="text-xs text-neutral-500">
                   {knots.length === 0
-                    ? "Add at least one knot to analyze."
-                    : `${knots.length} knot${knots.length !== 1 ? "s" : ""} across ${new Set(knots.map((k) => k.surface)).size} surface${new Set(knots.map((k) => k.surface)).size !== 1 ? "s" : ""}.`}
+                    ? "Add at least one knot, then generate the 6 surface photos."
+                    : `${knots.length} knot${knots.length !== 1 ? "s" : ""} across ${new Set(knots.map((k) => k.surface)).size} surface${new Set(knots.map((k) => k.surface)).size !== 1 ? "s" : ""}. Step 1: render → Step 2: AI analyse.`}
                 </p>
               </div>
             </div>
@@ -360,10 +426,13 @@ export default function EditorPage() {
               Drag to rotate the 3D plank. Amber lines pass through the plank where Gemini matched through-knots.
             </p>
 
-            {/* 2D unfolded panel */}
+            {/* 2D gallery — opposite pairs side by side */}
             <div className="rounded-2xl border border-neutral-800 bg-neutral-900 p-4 sm:p-5">
-              <h3 className="text-sm font-semibold text-neutral-300 mb-3">Unfolded surfaces & matched pairs</h3>
-              <SurfaceUnfolded
+              <h3 className="text-sm font-semibold text-neutral-300 mb-1">Detected knots & matched pairs</h3>
+              <p className="text-xs text-neutral-600 mb-4">
+                Each row shows a pair of opposite faces. Amber dashed lines connect through-knots Gemini matched.
+              </p>
+              <SurfaceGallery
                 analysis={analysis}
                 dimensions={dimensions}
                 surfaceImages={surfaceImages}
@@ -389,7 +458,7 @@ export default function EditorPage() {
               </button>
               <button
                 type="button"
-                onClick={handleReset}
+                onClick={handleBackToEdit}
                 className="flex items-center gap-2 px-5 py-3 rounded-xl bg-amber-500 text-neutral-950 font-semibold hover:bg-amber-400 active:scale-[0.98] transition-all min-h-[44px]"
               >
                 <Pencil size={16} />

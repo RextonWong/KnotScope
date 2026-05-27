@@ -2,7 +2,7 @@
 
 import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
-import { Suspense, useEffect, useMemo } from "react";
+import { Suspense, useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import type { Analysis6, Knot } from "@/lib/schema";
 import type { PlankDimensions, SurfaceId } from "@/lib/plank";
@@ -149,7 +149,17 @@ function PairLine3D({
 
 function FitCamera({ dimensions }: { dimensions: PlankDimensions }) {
   const { camera } = useThree();
+  const prevDimsRef = useRef<PlankDimensions | null>(null);
   useEffect(() => {
+    const prev = prevDimsRef.current;
+    const changed =
+      !prev ||
+      prev.length_mm !== dimensions.length_mm ||
+      prev.width_mm !== dimensions.width_mm ||
+      prev.thickness_mm !== dimensions.thickness_mm;
+    if (!changed) return;
+    prevDimsRef.current = dimensions;
+
     const L = dimensions.length_mm * MM_TO_WORLD;
     const W = dimensions.width_mm * MM_TO_WORLD;
     const T = dimensions.thickness_mm * MM_TO_WORLD;

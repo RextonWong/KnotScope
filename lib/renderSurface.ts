@@ -90,13 +90,16 @@ interface Palette {
   seedSalt: number;
 }
 
+// Tuned to look like photographed pine / oak board planks under warm light.
+// Each surface gets a slightly different palette so Gemini can distinguish
+// face vs edge vs end-grain even when they share noise seeds.
 const PALETTES: Record<SurfaceId, Palette> = {
-  front:  { base: [190, 145,  98], dark: [128,  84,  46], light: [218, 178, 130], seedSalt: 11 },
-  back:   { base: [188, 142,  96], dark: [126,  82,  44], light: [216, 176, 128], seedSalt: 22 },
-  top:    { base: [176, 128,  82], dark: [112,  72,  38], light: [206, 162, 116], seedSalt: 33 },
-  bottom: { base: [178, 130,  84], dark: [114,  74,  40], light: [208, 164, 118], seedSalt: 44 },
-  left:   { base: [196, 152, 104], dark: [134,  90,  52], light: [222, 184, 138], seedSalt: 55 },
-  right:  { base: [196, 152, 104], dark: [134,  90,  52], light: [222, 184, 138], seedSalt: 66 },
+  front:  { base: [178, 132,  82], dark: [ 82,  48,  22], light: [221, 184, 134], seedSalt: 11 },
+  back:   { base: [180, 134,  84], dark: [ 84,  50,  24], light: [223, 186, 136], seedSalt: 22 },
+  top:    { base: [168, 120,  74], dark: [ 70,  40,  18], light: [206, 162, 112], seedSalt: 33 },
+  bottom: { base: [170, 122,  76], dark: [ 72,  42,  20], light: [208, 164, 114], seedSalt: 44 },
+  left:   { base: [196, 154, 104], dark: [110,  72,  40], light: [228, 192, 144], seedSalt: 55 },
+  right:  { base: [196, 154, 104], dark: [110,  72,  40], light: [228, 192, 144], seedSalt: 66 },
 };
 
 function mixRgb(
@@ -118,9 +121,9 @@ function rgbStr([r, g, b]: [number, number, number]): string {
 // ── Wood grain renderer ──────────────────────────────────────────────────────
 
 interface RenderOpts {
-  pxPerMm?: number; // default 4
-  maxEdgePx?: number; // default 1024
-  jpegQuality?: number; // default 0.85
+  pxPerMm?: number;     // default 6
+  maxEdgePx?: number;   // default 1280
+  jpegQuality?: number; // default 0.88
 }
 
 function pickSize(
@@ -128,8 +131,10 @@ function pickSize(
   height_mm: number,
   opts: RenderOpts
 ): { wPx: number; hPx: number; scale: number } {
-  const target = opts.pxPerMm ?? 4;
-  const maxEdge = opts.maxEdgePx ?? 1024;
+  const target = opts.pxPerMm ?? 6;
+  const maxEdge = opts.maxEdgePx ?? 1280;
+  // Also enforce a sensible minimum for very thin edges so they stay legible.
+  const minShort = 96;
   let wPx = Math.round(width_mm * target);
   let hPx = Math.round(height_mm * target);
   const longest = Math.max(wPx, hPx);
@@ -138,83 +143,176 @@ function pickSize(
     wPx = Math.round(wPx * s);
     hPx = Math.round(hPx * s);
   }
-  // Effective px-per-mm after capping
+  // Bump up the short edge so very flat surfaces still have visible texture.
+  if (wPx < hPx) {
+    if (wPx < minShort) {
+      const s = minShort / wPx;
+      wPx = minShort;
+      hPx = Math.round(hPx * s);
+    }
+  } else {
+    if (hPx < minShort) {
+      const s = minShort / hPx;
+      hPx = minShort;
+      wPx = Math.round(wPx * s);
+    }
+  }
   const scale = wPx / width_mm;
   return { wPx, hPx, scale };
 }
 
-// Paint a wood-grain background covering the whole canvas.
+// Paint a photorealistic wood-grain background covering the whole canvas.
+//
+// Approach:
+//   1. Decide grain direction (always along the surface's long axis).
+//   2. Pick ring spacing so we see ~6–10 rings across the short axis —
+//      this is what real boards look like at typical face widths.
+//   3. Compute a "band position" with low-frequency noise wobble, then map
+//      the fractional part to a band profile: wide soft light early-wood +
+//      narrow sharp dark late-wood. This is how real growth rings appear.
+//   4. Add a SLOW color variation field so different regions of the board
+//      lean lighter or darker overall.
+//   5. Add medullary rays (perpendicular short streaks) and per-pixel grit.
 function paintWood(
   ctx: CanvasRenderingContext2D,
   surface: SurfaceId,
   wPx: number,
-  hPx: number,
-  scale_pxPerMm: number
+  hPx: number
 ): void {
   const palette = PALETTES[surface];
   const isEndGrain = surface === "left" || surface === "right";
+  const longAxisIsX = wPx >= hPx;
 
   const baseSeed = palette.seedSalt;
-  const noiseGrain = makeNoise(baseSeed * 1009);
-  const noiseFine = makeNoise(baseSeed * 7919);
+  const nGrain = makeNoise(baseSeed * 1009);
+  const nFine = makeNoise(baseSeed * 7919);
+  const nWarp = makeNoise(baseSeed * 401);
+  const nColor = makeNoise(baseSeed * 137);
+
+  const shortAxisPx = Math.min(wPx, hPx);
+  // 7 ± 2 visible rings across the short axis — natural for boards
+  const ringCount = 7 + (baseSeed % 5);
+  const ringSpacingPx = shortAxisPx / ringCount;
 
   const img = ctx.createImageData(wPx, hPx);
   const data = img.data;
 
-  // Grain frequency: how many rings per inch ~= every 5–8 mm a band
-  const grainPeriodMm = 6;
-  const grainFreq = (2 * Math.PI) / (grainPeriodMm * scale_pxPerMm);
+  // For end-grain surfaces (the short sawn ends), the rings form arcs around
+  // a slightly off-center pith point. Place the pith outside the visible
+  // area for plank-style "tangential" rings.
+  const pithCx = wPx * (0.5 - 0.6);
+  const pithCy = hPx * (0.5 + 0.3);
 
   for (let y = 0; y < hPx; y++) {
     for (let x = 0; x < wPx; x++) {
-      // Distort the coord with low-freq noise so grain lines wave realistically
-      const dx = fbm(noiseGrain, x / 80, y / 600, 3) * 18;
-      const dy = fbm(noiseGrain, x / 600, y / 80, 3) * 4;
+      // Subtle warp so grain lines aren't dead-straight
+      const wx = fbm(nWarp, x / 90, y / 220, 3) * ringSpacingPx * 0.45;
+      const wy = fbm(nWarp, x / 220, y / 90, 3) * ringSpacingPx * 0.15;
 
-      let t: number;
+      let bandPos: number;
       if (isEndGrain) {
-        // End grain: concentric rings centered roughly on the cross-section
-        const cx = wPx / 2;
-        const cy = hPx * 0.4;
-        const r = Math.sqrt((x - cx) * (x - cx) + (y - cy) * (y - cy));
-        // Add radial wobble
-        const wob = fbm(noiseGrain, x / 50, y / 50, 3) * 8;
-        t = 0.5 + 0.5 * Math.sin((r + wob) * grainFreq * 1.4);
+        const dxp = x - pithCx + wx;
+        const dyp = y - pithCy + wy;
+        const r = Math.sqrt(dxp * dxp + dyp * dyp);
+        bandPos = r / (ringSpacingPx * 0.85);
       } else {
-        // Long grain: bands running along the length (x axis)
-        t = 0.5 + 0.5 * Math.sin((y + dy) * grainFreq + (x + dx) * grainFreq * 0.06);
+        const acrossAxis = longAxisIsX ? y + wy : x + wx;
+        bandPos = acrossAxis / ringSpacingPx;
       }
 
-      // Sharpen the bands so they look more like rings, not a sine wave
-      t = Math.pow(t, 1.8);
+      // Phase within the current ring [0..1)
+      const phase = bandPos - Math.floor(bandPos);
 
-      // Mix dark→base→light along t with a small amount of noise jitter
-      const fine = fbm(noiseFine, x / 12, y / 12, 4) * 0.1;
-      const tt = Math.max(0, Math.min(1, t + fine * 0.3));
+      // Band profile: light early-wood for ~75% of the cycle, dark late-wood
+      // packed into the last ~25%. The dark region has a sharper falloff so
+      // it reads as a crisp growth-ring line.
+      let t: number;
+      if (phase < 0.78) {
+        // Gentle gradient from base ↑ to light ↑ then back ↓ to base
+        const p = phase / 0.78;
+        t = 0.40 + 0.30 * Math.sin(p * Math.PI);
+      } else {
+        // Dark late-wood
+        const p = (phase - 0.78) / 0.22; // 0..1
+        // Triangle, sharper toward middle of the dark stripe
+        const tri = 1 - Math.abs(p - 0.5) * 2;
+        t = 0.08 + 0.18 * (1 - Math.pow(tri, 0.6));
+      }
+
+      // Slow color variation — gives the board a non-uniform overall hue
+      const colorVar = fbm(nColor, x / 280, y / 280, 3) * 0.18;
+      t = Math.max(0, Math.min(1, t + colorVar));
+
+      // Mix the palette
       let col: [number, number, number];
-      if (tt < 0.5) col = mixRgb(palette.dark, palette.base, tt * 2);
-      else col = mixRgb(palette.base, palette.light, (tt - 0.5) * 2);
+      if (t < 0.38) {
+        col = mixRgb(palette.dark, palette.base, t / 0.38);
+      } else if (t < 0.78) {
+        col = mixRgb(palette.base, palette.light, (t - 0.38) / 0.40);
+      } else {
+        // Past "max light" — pull back toward base so the brightest pixels
+        // don't blow out
+        col = mixRgb(palette.light, palette.base, (t - 0.78) / 0.22 * 0.4);
+      }
 
-      // Slight darkening towards edges (vignette)
+      // Subtle multiplicative noise so flat areas have texture
+      const grit = fbm(nFine, x / 1.4, y / 1.4, 1);
+      const gritFac = 1 + grit * 0.06;
+      col[0] *= gritFac;
+      col[1] *= gritFac;
+      col[2] *= gritFac;
+
+      // Mild edge darkening so the board reads as a 3D object
       const vx = Math.min(x, wPx - x) / wPx;
       const vy = Math.min(y, hPx - y) / hPx;
-      const vig = Math.min(1, Math.min(vx, vy) * 6);
-      const vfac = 0.85 + 0.15 * vig;
-      col[0] *= vfac;
-      col[1] *= vfac;
-      col[2] *= vfac;
+      const vig = 1 - Math.min(1, Math.min(vx, vy) * 12) * 0.04;
+      col[0] *= vig;
+      col[1] *= vig;
+      col[2] *= vig;
 
-      // Per-pixel noise grain
-      const grit = fbm(noiseFine, x / 1.5, y / 1.5, 1) * 8;
       const i = (y * wPx + x) * 4;
-      data[i] = Math.max(0, Math.min(255, col[0] + grit));
-      data[i + 1] = Math.max(0, Math.min(255, col[1] + grit));
-      data[i + 2] = Math.max(0, Math.min(255, col[2] + grit));
+      data[i] = Math.max(0, Math.min(255, col[0]));
+      data[i + 1] = Math.max(0, Math.min(255, col[1]));
+      data[i + 2] = Math.max(0, Math.min(255, col[2]));
       data[i + 3] = 255;
     }
   }
 
   ctx.putImageData(img, 0, 0);
+
+  // ── Post-pass: medullary rays + fine flecks (long faces only) ────────────
+  if (!isEndGrain) {
+    const rng = mulberry32(baseSeed * 31);
+    ctx.save();
+    // Medullary rays: short streaks perpendicular to grain
+    ctx.strokeStyle = "rgba(40, 24, 12, 0.10)";
+    ctx.lineCap = "round";
+    const rayCount = 18 + Math.floor(rng() * 18);
+    for (let i = 0; i < rayCount; i++) {
+      const px = rng() * wPx;
+      const py = rng() * hPx;
+      const len = 6 + rng() * 30;
+      const baseAng = longAxisIsX ? Math.PI / 2 : 0;
+      const ang = baseAng + (rng() - 0.5) * 0.5;
+      ctx.lineWidth = 0.5 + rng() * 0.8;
+      ctx.beginPath();
+      ctx.moveTo(px, py);
+      ctx.lineTo(px + Math.cos(ang) * len, py + Math.sin(ang) * len);
+      ctx.stroke();
+    }
+    // A few darker flecks for character
+    ctx.fillStyle = "rgba(50, 28, 14, 0.18)";
+    const fleckCount = 10 + Math.floor(rng() * 12);
+    for (let i = 0; i < fleckCount; i++) {
+      const px = rng() * wPx;
+      const py = rng() * hPx;
+      const r = 0.6 + rng() * 1.6;
+      ctx.beginPath();
+      ctx.ellipse(px, py, r * 2, r * 0.7, longAxisIsX ? 0 : Math.PI / 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
 }
 
 // ── Knot painter ─────────────────────────────────────────────────────────────
@@ -456,7 +554,7 @@ export async function renderSurface(
   opts: RenderOpts = {}
 ): Promise<RenderedSurface> {
   const s = getSurfaceSize(surface, dims);
-  const { wPx, hPx, scale } = pickSize(s.width_mm, s.height_mm, opts);
+  const { wPx, hPx } = pickSize(s.width_mm, s.height_mm, opts);
 
   const canvas =
     typeof document !== "undefined"
@@ -467,7 +565,7 @@ export async function renderSurface(
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Canvas 2D context unavailable");
 
-  paintWood(ctx, surface, wPx, hPx, scale);
+  paintWood(ctx, surface, wPx, hPx);
 
   // Paint only the knots that belong to this surface
   const mine = knots.filter((k) => k.surface === surface);
@@ -475,7 +573,7 @@ export async function renderSurface(
     paintKnot(ctx, k, surface, dims, wPx, hPx);
   }
 
-  const dataUrl = canvas.toDataURL("image/jpeg", opts.jpegQuality ?? 0.85);
+  const dataUrl = canvas.toDataURL("image/jpeg", opts.jpegQuality ?? 0.88);
   const base64 = dataUrl.split(",")[1] ?? "";
   return { base64, mime: "image/jpeg", widthPx: wPx, heightPx: hPx };
 }

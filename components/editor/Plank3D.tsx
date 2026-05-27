@@ -227,8 +227,21 @@ function KnotMarker({ x, y, radius, knot, selected, onSelect }: KnotMarkerProps)
 // ── Camera framing — auto-fit the plank in the view on dimension changes ────
 
 function FitCamera({ dimensions }: { dimensions: PlankDimensions }) {
-  const { camera, size } = useThree();
+  const { camera } = useThree();
+  // Track previous dimension VALUES so refit only happens when the user
+  // actually changes a slider — not when the parent re-renders for any
+  // other reason (e.g. selecting a knot, dragging a slider).
+  const prevDimsRef = useRef<PlankDimensions | null>(null);
   useEffect(() => {
+    const prev = prevDimsRef.current;
+    const changed =
+      !prev ||
+      prev.length_mm !== dimensions.length_mm ||
+      prev.width_mm !== dimensions.width_mm ||
+      prev.thickness_mm !== dimensions.thickness_mm;
+    if (!changed) return;
+    prevDimsRef.current = dimensions;
+
     const L = dimensions.length_mm * MM_TO_WORLD;
     const W = dimensions.width_mm * MM_TO_WORLD;
     const T = dimensions.thickness_mm * MM_TO_WORLD;
@@ -238,7 +251,7 @@ function FitCamera({ dimensions }: { dimensions: PlankDimensions }) {
     camera.position.set(dist * 0.5, dist * 0.45, dist * 0.7);
     camera.lookAt(0, 0, 0);
     camera.updateProjectionMatrix();
-  }, [dimensions, camera, size]);
+  }, [dimensions, camera]);
   return null;
 }
 
