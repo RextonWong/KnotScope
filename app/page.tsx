@@ -9,7 +9,8 @@ import { KnotDetailPanel } from "@/components/KnotDetailPanel";
 import { LoadingState } from "@/components/LoadingState";
 import { SampleBoards } from "@/components/SampleBoards";
 import { bboxCenter } from "@/lib/bbox";
-import { TreePine, Zap, RotateCcw, Download, PanelRight, History, FileJson } from "lucide-react";
+import { TreePine, Zap, RotateCcw, Download, PanelRight, History, FileJson, Boxes } from "lucide-react";
+import Link from "next/link";
 import type { Analysis } from "@/lib/schema";
 import { HistoryPanel } from "@/components/HistoryPanel";
 import { generateThumbnail, saveRecord, exportRecordJson, type HistoryRecord } from "@/lib/history";
@@ -341,10 +342,17 @@ export default function Home() {
         <span className="hidden sm:inline text-xs text-neutral-600 font-medium ml-1">
           Lumber Inspection AI
         </span>
+        <Link
+          href="/editor"
+          className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-amber-500/40 text-amber-400 hover:border-amber-500 hover:bg-amber-500/10 text-xs font-medium transition-colors"
+        >
+          <Boxes size={14} />
+          6-Surface Editor
+        </Link>
         <button
           type="button"
           onClick={() => setHistoryOpen(true)}
-          className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-800 text-neutral-400 hover:border-neutral-600 hover:text-neutral-200 text-xs font-medium transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-800 text-neutral-400 hover:border-neutral-600 hover:text-neutral-200 text-xs font-medium transition-colors"
         >
           <History size={14} />
           History
@@ -370,6 +378,16 @@ export default function Home() {
             </div>
 
             <SampleBoards onSelect={(f, b) => { setFrontImage(f); setBackImage(b); }} />
+
+            <Link
+              href="/editor"
+              className="flex items-center gap-2.5 px-5 py-3 rounded-xl border border-amber-500/30 bg-amber-500/5 text-amber-300 hover:bg-amber-500/10 hover:border-amber-500/50 transition-colors text-sm"
+            >
+              <Boxes size={16} />
+              <span>
+                Or design your own plank in the <strong className="font-bold text-amber-200">6-Surface Editor</strong> &rarr;
+              </span>
+            </Link>
 
             <div className="flex flex-col items-center gap-2">
               <button

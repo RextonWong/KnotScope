@@ -1,0 +1,415 @@
+"use client";
+
+import { useCallback, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
+import Link from "next/link";
+import { toast } from "sonner";
+import {
+  ArrowLeft,
+  Boxes,
+  LayoutGrid,
+  Layers,
+  Maximize,
+  RotateCcw,
+  Zap,
+  Eye,
+  Pencil,
+  Download,
+} from "lucide-react";
+import type {
+  EditableKnot,
+  PlankDimensions,
+  SurfaceId,
+} from "@/lib/plank";
+import {
+  DEFAULT_DIMENSIONS,
+  SURFACE_IDS,
+} from "@/lib/plank";
+import type { Analysis6 } from "@/lib/schema";
+import { renderAllSurfaces } from "@/lib/renderSurface";
+import { GradeCard } from "@/components/GradeCard";
+import { LoadingState } from "@/components/LoadingState";
+import { KnotInspector } from "@/components/editor/KnotInspector";
+import { PlankSizePanel } from "@/components/editor/PlankSizePanel";
+import { SurfaceFlatEditor } from "@/components/editor/SurfaceFlatEditor";
+import { SurfaceUnfolded } from "@/components/editor/SurfaceUnfolded";
+
+// R3F components — client-only to avoid SSR Three.js issues
+const Plank3D = dynamic(
+  () => import("@/components/editor/Plank3D").then((m) => m.Plank3D),
+  { ssr: false, loading: () => <div className="w-full h-full bg-neutral-950 flex items-center justify-center text-xs text-neutral-600">Loading 3D viewer…</div> }
+);
+const ResultPlank3D = dynamic(
+  () => import("@/components/editor/ResultPlank3D").then((m) => m.ResultPlank3D),
+  { ssr: false, loading: () => <div className="w-full h-full bg-neutral-950 flex items-center justify-center text-xs text-neutral-600">Loading 3D viewer…</div> }
+);
+
+// We treat Analysis6 as compatible with GradeCard via a small adapter — GradeCard
+// only reads estimated_grade, total_knots, through_knot_count, max_knot_diameter_mm,
+// and reasoning, all of which live on Analysis6.
+
+type EditMode = "3d" | "flat";
+type Phase = "edit" | "loading" | "results";
+
+export default function EditorPage() {
+  // ── Editor state ──────────────────────────────────────────────────────────
+  const [dimensions, setDimensions] = useState<PlankDimensions>(DEFAULT_DIMENSIONS);
+  const [knots, setKnots] = useState<EditableKnot[]>([]);
+  const [selectedKnotId, setSelectedKnotId] = useState<string | null>(null);
+  const [editMode, setEditMode] = useState<EditMode>("3d");
+  const [activeSurface, setActiveSurface] = useState<SurfaceId>("front");
+
+  // ── Phase / results state ─────────────────────────────────────────────────
+  const [phase, setPhase] = useState<Phase>("edit");
+  const [analysis, setAnalysis] = useState<Analysis6 | null>(null);
+  const [surfaceImages, setSurfaceImages] = useState<Record<SurfaceId, string> | null>(null);
+  const [resultSelected, setResultSelected] = useState<{ surface: SurfaceId; id: number } | null>(null);
+  const boardIdRef = useRef(`plank-${Date.now()}`);
+
+  // ── Knot ops ──────────────────────────────────────────────────────────────
+  const addKnot = useCallback((knot: EditableKnot) => {
+    setKnots((prev) => [...prev, knot]);
+    setSelectedKnotId(knot.id);
+  }, []);
+
+  const addKnotAtUv = useCallback(
+    (surface: SurfaceId, u: number, v: number) => {
+      const newKnot: EditableKnot = {
+        id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+        surface, u, v,
+        diameter_mm: 20,
+        aspect_ratio: 1,
+        rotation_deg: 0,
+        shape: "circle",
+        type: "live",
+        darkness: 0.5,
+      };
+      setKnots((prev) => [...prev, newKnot]);
+      setSelectedKnotId(newKnot.id);
+      setActiveSurface(surface);
+    },
+    []
+  );
+
+  const updateKnot = useCallback((id: string, patch: Partial<EditableKnot>) => {
+    setKnots((prev) => prev.map((k) => (k.id === id ? { ...k, ...patch } : k)));
+  }, []);
+
+  const deleteSelectedKnot = useCallback(() => {
+    if (!selectedKnotId) return;
+    setKnots((prev) => prev.filter((k) => k.id !== selectedKnotId));
+    setSelectedKnotId(null);
+  }, [selectedKnotId]);
+
+  const selectedKnot = useMemo(
+    () => knots.find((k) => k.id === selectedKnotId) ?? null,
+    [knots, selectedKnotId]
+  );
+
+  // ── Analyze ───────────────────────────────────────────────────────────────
+  const handleAnalyze = useCallback(async () => {
+    setPhase("loading");
+    setResultSelected(null);
+    try {
+      // Render all 6 surfaces in the browser
+      const rendered = await renderAllSurfaces(dimensions, knots);
+      const payloadSurfaces = {} as Record<SurfaceId, { base64: string; mime: string }>;
+      const imageState = {} as Record<SurfaceId, string>;
+      for (const s of SURFACE_IDS) {
+        payloadSurfaces[s] = { base64: rendered[s].base64, mime: rendered[s].mime };
+        imageState[s] = rendered[s].base64;
+      }
+      setSurfaceImages(imageState);
+
+      const res = await fetch("/api/analyze6", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dimensions, surfaces: payloadSurfaces }),
+      });
+      const data = (await res.json()) as unknown;
+      if (!res.ok) {
+        const err = data as { error?: string };
+        throw new Error(err.error ?? "Analysis failed");
+      }
+      const result = data as Analysis6;
+      setAnalysis(result);
+      boardIdRef.current = `plank-${Date.now()}`;
+      setPhase("results");
+
+      const summary =
+        result.total_knots === 0
+          ? "No knots detected — clean plank."
+          : `Grade ${result.estimated_grade} — ${result.total_knots} knots, ${result.through_knot_count} through-knot${result.through_knot_count !== 1 ? "s" : ""}.`;
+      toast.success(summary, { duration: 5000 });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      toast.error(`Analysis failed: ${msg}`);
+      setPhase("edit");
+    }
+  }, [dimensions, knots]);
+
+  const handleReset = () => {
+    setPhase("edit");
+    setResultSelected(null);
+  };
+
+  const handleClearAll = () => {
+    setKnots([]);
+    setSelectedKnotId(null);
+  };
+
+  const handleExportJson = () => {
+    if (!analysis || !surfaceImages) return;
+    const payload = {
+      knotscope_version: "1.0",
+      kind: "6-surface",
+      exported_at: new Date().toISOString(),
+      board_id: boardIdRef.current,
+      dimensions,
+      summary: {
+        estimated_grade: analysis.estimated_grade,
+        total_knots: analysis.total_knots,
+        through_knot_count: analysis.through_knot_count,
+        max_knot_diameter_mm: analysis.max_knot_diameter_mm,
+        reasoning: analysis.reasoning,
+      },
+      surfaces: analysis.surfaces,
+      through_knot_pairs: analysis.pairs,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `knotscope-6surface-${boardIdRef.current}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // ── Render ────────────────────────────────────────────────────────────────
+  return (
+    <div className="min-h-screen bg-neutral-950 text-neutral-100">
+      {/* Nav */}
+      <nav className="border-b border-neutral-800 px-4 sm:px-6 py-4 flex items-center gap-3">
+        <Link
+          href="/"
+          className="flex items-center gap-1.5 text-sm text-neutral-400 hover:text-neutral-200 transition-colors"
+        >
+          <ArrowLeft size={15} />
+          Back
+        </Link>
+        <span className="mx-2 text-neutral-700">·</span>
+        <Boxes size={18} className="text-amber-500" />
+        <span className="font-bold tracking-tight">6-Surface Plank Editor</span>
+        <span className="hidden sm:inline text-xs text-neutral-600 ml-2">Demo: AI through-knot reasoning</span>
+      </nav>
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        {phase === "loading" && <LoadingState />}
+
+        {phase === "edit" && (
+          <div className="flex flex-col xl:flex-row gap-4 xl:gap-6">
+            {/* Left rail: plank size */}
+            <div className="xl:w-64 flex flex-col gap-4 shrink-0">
+              <PlankSizePanel dimensions={dimensions} onChange={setDimensions} />
+
+              {/* Mode toggle */}
+              <div className="bg-neutral-900 rounded-2xl border border-neutral-800 p-3 flex flex-col gap-2">
+                <span className="text-xs uppercase tracking-wider text-neutral-500 px-1">View</span>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditMode("3d")}
+                    className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-colors ${
+                      editMode === "3d"
+                        ? "bg-amber-500 text-neutral-950"
+                        : "bg-neutral-800 text-neutral-400 hover:text-neutral-200"
+                    }`}
+                  >
+                    <Layers size={13} />
+                    3D
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditMode("flat")}
+                    className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-colors ${
+                      editMode === "flat"
+                        ? "bg-amber-500 text-neutral-950"
+                        : "bg-neutral-800 text-neutral-400 hover:text-neutral-200"
+                    }`}
+                  >
+                    <LayoutGrid size={13} />
+                    Flat
+                  </button>
+                </div>
+
+                {editMode === "flat" && (
+                  <div className="flex flex-col gap-1 mt-1">
+                    <span className="text-[10px] uppercase tracking-wider text-neutral-600 px-1">Surface</span>
+                    <select
+                      value={activeSurface}
+                      onChange={(e) => setActiveSurface(e.target.value as SurfaceId)}
+                      className="bg-neutral-800 border border-neutral-700 rounded-lg text-xs py-1.5 px-2 text-neutral-200"
+                    >
+                      {SURFACE_IDS.map((s) => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              {/* Clear all */}
+              {knots.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleClearAll}
+                  className="text-xs text-neutral-500 hover:text-red-400 transition-colors text-left px-1"
+                >
+                  Clear all knots ({knots.length})
+                </button>
+              )}
+            </div>
+
+            {/* Center: editor viewport */}
+            <div className="flex-1 min-w-0 flex flex-col gap-4">
+              <div className="rounded-2xl border border-neutral-800 overflow-hidden bg-neutral-900" style={{ height: "60vh", minHeight: 400 }}>
+                {editMode === "3d" ? (
+                  <Plank3D
+                    dimensions={dimensions}
+                    knots={knots}
+                    selectedKnotId={selectedKnotId}
+                    onAddKnot={addKnotAtUv}
+                    onSelectKnot={setSelectedKnotId}
+                    onSelectSurface={setActiveSurface}
+                  />
+                ) : (
+                  <div className="w-full h-full p-3 overflow-auto">
+                    <SurfaceFlatEditor
+                      surface={activeSurface}
+                      dimensions={dimensions}
+                      knots={knots}
+                      selectedKnotId={selectedKnotId}
+                      onAddKnot={addKnot}
+                      onUpdateKnot={updateKnot}
+                      onSelectKnot={setSelectedKnotId}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Analyze CTA */}
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleAnalyze}
+                  disabled={knots.length === 0}
+                  className="flex items-center gap-2 px-6 py-3 rounded-xl bg-amber-500 text-neutral-950 font-bold text-sm hover:bg-amber-400 active:scale-[0.98] transition-all disabled:opacity-30 disabled:cursor-not-allowed min-h-[48px]"
+                >
+                  <Zap size={16} />
+                  Analyze Plank
+                </button>
+                <p className="text-xs text-neutral-500">
+                  {knots.length === 0
+                    ? "Add at least one knot to analyze."
+                    : `${knots.length} knot${knots.length !== 1 ? "s" : ""} across ${new Set(knots.map((k) => k.surface)).size} surface${new Set(knots.map((k) => k.surface)).size !== 1 ? "s" : ""}.`}
+                </p>
+              </div>
+            </div>
+
+            {/* Right rail: knot inspector */}
+            <div className="xl:w-72 shrink-0">
+              <KnotInspector
+                knot={selectedKnot}
+                onUpdate={(patch) => selectedKnot && updateKnot(selectedKnot.id, patch)}
+                onDelete={deleteSelectedKnot}
+              />
+            </div>
+          </div>
+        )}
+
+        {phase === "results" && analysis && surfaceImages && (
+          <div className="flex flex-col gap-6">
+            {/* Header row */}
+            <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 items-start">
+              <div className="flex-1">
+                <h2 className="text-xl sm:text-2xl font-bold mb-1">6-Surface Analysis Complete</h2>
+                <p className="text-neutral-500 text-sm">
+                  Plank ID:{" "}
+                  <span className="font-mono text-neutral-400">{boardIdRef.current}</span>
+                  <span className="mx-2 text-neutral-700">·</span>
+                  {dimensions.length_mm} × {dimensions.width_mm} × {dimensions.thickness_mm} mm
+                </p>
+              </div>
+              <div className="w-full sm:w-72">
+                {/* GradeCard works with Analysis6 since it only reads grade/stat fields */}
+                <GradeCard analysis={analysis as unknown as Parameters<typeof GradeCard>[0]["analysis"]} />
+              </div>
+            </div>
+
+            {/* 3D hero */}
+            <div className="rounded-2xl border border-neutral-800 overflow-hidden bg-neutral-900" style={{ height: "55vh", minHeight: 380 }}>
+              <ResultPlank3D
+                analysis={analysis}
+                dimensions={dimensions}
+                surfaceImages={surfaceImages}
+                selectedKnot={resultSelected}
+              />
+            </div>
+
+            <p className="text-xs text-neutral-500 -mt-2 text-center">
+              Drag to rotate the 3D plank. Amber lines pass through the plank where Gemini matched through-knots.
+            </p>
+
+            {/* 2D unfolded panel */}
+            <div className="rounded-2xl border border-neutral-800 bg-neutral-900 p-4 sm:p-5">
+              <h3 className="text-sm font-semibold text-neutral-300 mb-3">Unfolded surfaces & matched pairs</h3>
+              <SurfaceUnfolded
+                analysis={analysis}
+                dimensions={dimensions}
+                surfaceImages={surfaceImages}
+                selectedKnot={resultSelected}
+                onSelectKnot={setResultSelected}
+              />
+            </div>
+
+            {/* Reasoning + actions */}
+            <div className="rounded-2xl border border-neutral-800 bg-neutral-900 p-5">
+              <p className="text-xs uppercase tracking-wider text-neutral-500 mb-2">AI reasoning</p>
+              <p className="text-sm text-neutral-300 italic leading-relaxed">{analysis.reasoning}</p>
+            </div>
+
+            <div className="flex gap-3 flex-wrap">
+              <button
+                type="button"
+                onClick={handleExportJson}
+                className="flex items-center gap-2 px-5 py-3 rounded-xl border border-neutral-700 text-neutral-200 font-semibold hover:border-amber-500/50 transition-colors min-h-[44px]"
+              >
+                <Download size={16} />
+                Export JSON
+              </button>
+              <button
+                type="button"
+                onClick={handleReset}
+                className="flex items-center gap-2 px-5 py-3 rounded-xl bg-amber-500 text-neutral-950 font-semibold hover:bg-amber-400 active:scale-[0.98] transition-all min-h-[44px]"
+              >
+                <Pencil size={16} />
+                Back to Editor
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  handleClearAll();
+                  setPhase("edit");
+                }}
+                className="flex items-center gap-2 px-5 py-3 rounded-xl border border-neutral-700 text-neutral-300 font-semibold hover:border-neutral-500 transition-colors min-h-[44px]"
+              >
+                <RotateCcw size={16} />
+                New Plank
+              </button>
+            </div>
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}
