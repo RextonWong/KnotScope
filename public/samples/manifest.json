@@ -1,0 +1,26 @@
+[
+  {
+    "id": "board-01",
+    "species": "Pine",
+    "front": "/samples/board-01-front.jpg",
+    "back": "/samples/board-01-back.jpg"
+  },
+  {
+    "id": "board-02",
+    "species": "Oak",
+    "front": "/samples/board-02-front.jpg",
+    "back": "/samples/board-02-back.jpg"
+  },
+  {
+    "id": "board-03",
+    "species": "Fir",
+    "front": "/samples/board-03-front.jpg",
+    "back": "/samples/board-03-back.jpg"
+  },
+  {
+    "id": "board-04",
+    "species": "Spruce",
+    "front": "/samples/board-04-front.jpg",
+    "back": "/samples/board-04-back.jpg"
+  }
+]
