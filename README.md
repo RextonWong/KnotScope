@@ -1,6 +1,6 @@
 # KnotScope
 
-A web app for lumber graders. Upload two photos of the same wooden board — front face and back face — and the app uses Gemini Flash to detect knots on each face, pair knots that pass through the board (the same branch visible on both sides), compute a structural grade, and produce an exportable PDF report.
+A web app for lumber graders. Upload two photos of the same wooden board (front face and back face), and the app uses Gemini Flash 3.5 to detect knots on each face, then pair the knots that pass through the board (the same branch visible on both sides), compute a structural grade, and produce an exportable PDF report.
 
 This approach replaces the two custom-trained models (YOLOv8 detector + triplet pairing network) from [arXiv 2505.05845](https://arxiv.org/abs/2505.05845) with a single multimodal LLM call.
 
@@ -92,3 +92,4 @@ Set `GEMINI_API_KEY` in your Vercel project's environment variables.
 - Powered by [Gemini Flash](https://deepmind.google/technologies/gemini/) via the `@google/genai` SDK
 - UI: [Next.js](https://nextjs.org), [Tailwind CSS](https://tailwindcss.com), [shadcn/ui](https://ui.shadcn.com)
 - PDF export: [@react-pdf/renderer](https://react-pdf.org)
+- Contributors: RextonWong, yongsonmckl
