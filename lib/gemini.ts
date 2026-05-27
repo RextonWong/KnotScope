@@ -47,7 +47,13 @@ GRADING
   - "B": some defects but structurally sound for general construction
   - "C": large dead knots or holes — decorative or non-structural use only
   - "Reject": severe defects, splits, or knot area over 25%
-- reasoning: 1-2 sentences explaining the grade`;
+- reasoning: 1-2 sentences explaining the grade
+
+VALIDITY
+Set is_lumber to true only if BOTH images clearly show a wooden board or
+lumber. If either image is not wood (e.g. a person, food, landscape, paper,
+or any non-lumber subject), set is_lumber to false and return empty arrays
+for front/back/pairs with zeroed numeric fields and estimated_grade "Reject".`;
 
 const knotItemSchema: Schema = {
   type: Type.OBJECT,
@@ -70,6 +76,7 @@ const knotItemSchema: Schema = {
 const GEMINI_RESPONSE_SCHEMA: Schema = {
   type: Type.OBJECT,
   properties: {
+    is_lumber: { type: Type.BOOLEAN },
     front: { type: Type.ARRAY, items: knotItemSchema },
     back: { type: Type.ARRAY, items: knotItemSchema },
     pairs: {
@@ -89,6 +96,7 @@ const GEMINI_RESPONSE_SCHEMA: Schema = {
     reasoning: { type: Type.STRING },
   },
   required: [
+    "is_lumber",
     "front",
     "back",
     "pairs",

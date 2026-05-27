@@ -32,6 +32,12 @@ export async function POST(req: NextRequest) {
 
   try {
     const analysis = await analyzeBoard(frontImage, backImage);
+    if (!analysis.is_lumber) {
+      return NextResponse.json(
+        { error: "Images do not appear to show a wooden board. Please upload front and back photos of actual lumber." },
+        { status: 422 }
+      );
+    }
     return NextResponse.json(analysis);
   } catch (err) {
     console.error("[analyze] Gemini error:", err);

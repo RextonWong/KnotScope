@@ -10,6 +10,7 @@ export const KnotSchema = z.object({
 });
 
 export const AnalysisSchema = z.object({
+  is_lumber: z.boolean(),
   front: z.array(KnotSchema),
   back: z.array(KnotSchema),
   pairs: z.array(z.tuple([z.number(), z.number(), z.number()])),
