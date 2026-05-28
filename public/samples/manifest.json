@@ -1,37 +1,93 @@
 [
   {
-    "id": "round-oval",
-    "label": "Round / Oval",
+    "id": "face-spike",
+    "label": "Face Spike Knot",
     "kind": "6face",
-    "description": "Small discrete knots — round, oval, and spike (lancet) variants. The paired round knot demonstrates through-knot detection.",
+    "description": "A lance-shaped (elongated) knot lying on the broad face of the board, with d_max measured along the grain and d_min across. The branch cut the face at a steep angle, producing a narrow ellipse with pointed ends.",
     "surfaces": {
-      "front": "/samples/round-oval-front.jpg",
-      "back": "/samples/round-oval-back.jpg",
-      "top": "/samples/round-oval-top.jpg",
-      "bottom": "/samples/round-oval-bottom.jpg",
-      "left": "/samples/round-oval-left.jpg",
-      "right": "/samples/round-oval-right.jpg"
+      "front": "/samples/face-spike-front.jpg",
+      "back": "/samples/face-spike-back.jpg",
+      "top": "/samples/face-spike-top.jpg",
+      "bottom": "/samples/face-spike-bottom.jpg",
+      "left": "/samples/face-spike-left.jpg",
+      "right": "/samples/face-spike-right.jpg"
     }
   },
   {
-    "id": "wide-face",
-    "label": "Wide Face Knots",
+    "id": "arris-spike",
+    "label": "Arris Spike Knot",
     "kind": "6face",
-    "description": "Splay knots where the branch hits the face at a shallow angle, producing a wide, flat cross-section. d_max is much larger than d_min.",
+    "description": "A spike knot intersecting the arris (long edge corner). Visible on the broad face as a triangular or wedge shape at the edge, and on the adjacent narrow edge surface. d_min is taken on the edge, d_max on the face.",
     "surfaces": {
-      "front": "/samples/wide-face-front.jpg",
-      "back": "/samples/wide-face-back.jpg",
-      "top": "/samples/wide-face-top.jpg",
-      "bottom": "/samples/wide-face-bottom.jpg",
-      "left": "/samples/wide-face-left.jpg",
-      "right": "/samples/wide-face-right.jpg"
+      "front": "/samples/arris-spike-front.jpg",
+      "back": "/samples/arris-spike-back.jpg",
+      "top": "/samples/arris-spike-top.jpg",
+      "bottom": "/samples/arris-spike-bottom.jpg",
+      "left": "/samples/arris-spike-left.jpg",
+      "right": "/samples/arris-spike-right.jpg"
+    }
+  },
+  {
+    "id": "edge-spike",
+    "label": "Edge Spike Knot",
+    "kind": "6face",
+    "description": "A spike knot primarily on the narrow edge surface. Only the very tip is visible at the face corner — the majority of the knot runs along the narrow edge. Common in flatsawn boards near the pith.",
+    "surfaces": {
+      "front": "/samples/edge-spike-front.jpg",
+      "back": "/samples/edge-spike-back.jpg",
+      "top": "/samples/edge-spike-top.jpg",
+      "bottom": "/samples/edge-spike-bottom.jpg",
+      "left": "/samples/edge-spike-left.jpg",
+      "right": "/samples/edge-spike-right.jpg"
+    }
+  },
+  {
+    "id": "splay-narrow",
+    "label": "Splay Knot — Narrow",
+    "kind": "6face",
+    "description": "A splay knot where d_max (across grain) is 2–3× d_min. The branch cut the face at an angle, producing a wide, shallow ellipse. Narrower variant — knot area is still low relative to face area.",
+    "surfaces": {
+      "front": "/samples/splay-narrow-front.jpg",
+      "back": "/samples/splay-narrow-back.jpg",
+      "top": "/samples/splay-narrow-top.jpg",
+      "bottom": "/samples/splay-narrow-bottom.jpg",
+      "left": "/samples/splay-narrow-left.jpg",
+      "right": "/samples/splay-narrow-right.jpg"
+    }
+  },
+  {
+    "id": "splay-medium",
+    "label": "Splay Knot — Medium",
+    "kind": "6face",
+    "description": "A splay knot where d_max is 3–4× d_min. The flat cross-section begins to occupy a significant fraction of the face width. Often the grade-limiting defect in intermediate-quality boards.",
+    "surfaces": {
+      "front": "/samples/splay-medium-front.jpg",
+      "back": "/samples/splay-medium-back.jpg",
+      "top": "/samples/splay-medium-top.jpg",
+      "bottom": "/samples/splay-medium-bottom.jpg",
+      "left": "/samples/splay-medium-left.jpg",
+      "right": "/samples/splay-medium-right.jpg"
+    }
+  },
+  {
+    "id": "splay-wide",
+    "label": "Splay Knot — Wide",
+    "kind": "6face",
+    "description": "A wide splay knot where d_max spans most of the face width. d_max is 4–6× d_min. This is a significant defect: the knot weakens the cross-section and often forces a Grade B or C assignment.",
+    "surfaces": {
+      "front": "/samples/splay-wide-front.jpg",
+      "back": "/samples/splay-wide-back.jpg",
+      "top": "/samples/splay-wide-top.jpg",
+      "bottom": "/samples/splay-wide-bottom.jpg",
+      "left": "/samples/splay-wide-left.jpg",
+      "right": "/samples/splay-wide-right.jpg"
     }
   },
   {
     "id": "spike-longitudinal",
     "label": "Spike Knot",
     "kind": "6face",
-    "description": "One large spike knot running parallel to the grain. d_max spans most of the board length while d_min is small — a challenging case for graders.",
+    "description": "A spike (grub) knot where the branch ran almost parallel to the board length before being cut. d_max spans much of the board length; d_min is very small. Rare but significant — often missed by visual inspection.",
     "surfaces": {
       "front": "/samples/spike-longitudinal-front.jpg",
       "back": "/samples/spike-longitudinal-back.jpg",
@@ -42,17 +98,45 @@
     }
   },
   {
-    "id": "edge-arris",
-    "label": "Edge / Arris Knots",
+    "id": "arris-single",
+    "label": "Arris Knot",
     "kind": "6face",
-    "description": "Knots intersecting the board edge or corner. Each knot appears on both the face and edge surface; some are arris knots crossing two surfaces at once.",
+    "description": "A knot centred on the arris (long-edge corner) of the board. It appears on both the face and the adjacent edge surface as a roughly triangular shape. d_min is the smaller of the two face measurements.",
     "surfaces": {
-      "front": "/samples/edge-arris-front.jpg",
-      "back": "/samples/edge-arris-back.jpg",
-      "top": "/samples/edge-arris-top.jpg",
-      "bottom": "/samples/edge-arris-bottom.jpg",
-      "left": "/samples/edge-arris-left.jpg",
-      "right": "/samples/edge-arris-right.jpg"
+      "front": "/samples/arris-single-front.jpg",
+      "back": "/samples/arris-single-back.jpg",
+      "top": "/samples/arris-single-top.jpg",
+      "bottom": "/samples/arris-single-bottom.jpg",
+      "left": "/samples/arris-single-left.jpg",
+      "right": "/samples/arris-single-right.jpg"
+    }
+  },
+  {
+    "id": "arris-compound",
+    "label": "Compound Arris Knot",
+    "kind": "6face",
+    "description": "Two adjacent arris knots meeting at the bottom edge, requiring separate d_min1 and d_min2 measurements. The overall d_min is the smaller of the two. Typical in boards with multiple closely spaced branches.",
+    "surfaces": {
+      "front": "/samples/arris-compound-front.jpg",
+      "back": "/samples/arris-compound-back.jpg",
+      "top": "/samples/arris-compound-top.jpg",
+      "bottom": "/samples/arris-compound-bottom.jpg",
+      "left": "/samples/arris-compound-left.jpg",
+      "right": "/samples/arris-compound-right.jpg"
+    }
+  },
+  {
+    "id": "arris-corner",
+    "label": "Corner Arris Knot",
+    "kind": "6face",
+    "description": "An arris knot at the end corner of the board, spanning the face, the narrow edge, and the end-grain surface. d_max is measured on the face; d_min on the narrower of the two adjacent surfaces.",
+    "surfaces": {
+      "front": "/samples/arris-corner-front.jpg",
+      "back": "/samples/arris-corner-back.jpg",
+      "top": "/samples/arris-corner-top.jpg",
+      "bottom": "/samples/arris-corner-bottom.jpg",
+      "left": "/samples/arris-corner-left.jpg",
+      "right": "/samples/arris-corner-right.jpg"
     }
   }
 ]

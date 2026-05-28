@@ -3,190 +3,341 @@ import type { PlankProject } from "./plank";
 export interface SamplePreset {
   id: string;
   label: string;
+  shortLabel: string;
   description: string;
   project: PlankProject;
 }
 
-// Four knot-type presets based on Fig 6 of the grading paper.
-// Each corresponds to a canonical knot shape / position category used in EN 1310.
-//
-// All use default 2400 × 150 × 25 mm dimensions so the rendered images
-// have realistic aspect ratios and the AI gets correct scale context.
+export interface DiagramRow {
+  label: string;
+  subtitle: string;
+  caseIds: string[];
+}
+
+// ── 10 knot cases from Fig 6 (EN 1310) ──────────────────────────────────────
+// Row 1 skips the first two (round/oval inside-wood knots — not visible from
+// outside). Rows are Face Spike, Splay, Spike, Arris.
 
 export const SAMPLE_PRESETS: SamplePreset[] = [
-  // ── Row 1: Round & oval knots + spike (lancet) knots ────────────────────
-  // Small discrete knots. Round/oval knots have d_min ≈ d_max;
-  // spike/lancet knots are elongated with d_min << d_max.
+
+  // ── Row 1: Face & edge spike knots ──────────────────────────────────────────
+
   {
-    id: "round-oval",
-    label: "Round / Oval",
-    description: "Small discrete knots — round, oval, and spike (lancet) variants. The paired round knot demonstrates through-knot detection.",
+    id: "face-spike",
+    label: "Face Spike Knot",
+    shortLabel: "Face Spike",
+    description:
+      "A lance-shaped (elongated) knot lying on the broad face of the board, " +
+      "with d_max measured along the grain and d_min across. The branch cut the " +
+      "face at a steep angle, producing a narrow ellipse with pointed ends.",
     project: {
       dimensions: { length_mm: 2400, width_mm: 150, thickness_mm: 25 },
       knots: [
-        // Round knot with through-tunnel
         {
-          id: "ro-k1",
+          id: "fs-k1",
           surface: "front",
-          u: 0.13, v: 0.38,
-          diameter_mm: 26, aspect_ratio: 1, rotation_deg: 0,
-          shape: "circle", type: "live", darkness: 0.55,
-          tunnel: { exit_kind: "through", exit_diameter_mm: 24, exit_du: 0, exit_dv: 0, depth_factor: 0.5 },
+          u: 0.45, v: 0.35,
+          diameter_mm: 22, aspect_ratio: 5.5, rotation_deg: 8,
+          shape: "spike", type: "live", darkness: 0.58,
+          tunnel: { exit_kind: "through", exit_diameter_mm: 20, exit_du: 0, exit_dv: 0, depth_factor: 0.5 },
         },
-        // Oval knot
+      ],
+    },
+  },
+
+  {
+    id: "arris-spike",
+    label: "Arris Spike Knot",
+    shortLabel: "Arris Spike",
+    description:
+      "A spike knot intersecting the arris (long edge corner). Visible on the " +
+      "broad face as a triangular or wedge shape at the edge, and on the adjacent " +
+      "narrow edge surface. d_min is taken on the edge, d_max on the face.",
+    project: {
+      dimensions: { length_mm: 2400, width_mm: 150, thickness_mm: 25 },
+      knots: [
+        // Spike knot at top edge of front face
         {
-          id: "ro-k2",
+          id: "as-k1",
           surface: "front",
-          u: 0.27, v: 0.65,
-          diameter_mm: 21, aspect_ratio: 1.6, rotation_deg: 18,
-          shape: "ellipse", type: "live", darkness: 0.5,
+          u: 0.60, v: 0.03,
+          diameter_mm: 28, aspect_ratio: 4.0, rotation_deg: 80,
+          shape: "spike", type: "dead", darkness: 0.68,
         },
-        // Dead round knot
+        // Same knot visible on top narrow edge
         {
-          id: "ro-k3",
-          surface: "front",
-          u: 0.44, v: 0.30,
-          diameter_mm: 19, aspect_ratio: 1, rotation_deg: 0,
-          shape: "circle", type: "dead", darkness: 0.70,
-        },
-        // Spike (lancet) knot
-        {
-          id: "ro-k4",
-          surface: "front",
-          u: 0.68, v: 0.28,
-          diameter_mm: 17, aspect_ratio: 3.8, rotation_deg: 10,
+          id: "as-k2",
+          surface: "top",
+          u: 0.60, v: 0.50,
+          diameter_mm: 22, aspect_ratio: 2.5, rotation_deg: 0,
           shape: "spike", type: "dead", darkness: 0.65,
         },
-        // Narrow spike near edge
+      ],
+    },
+  },
+
+  {
+    id: "edge-spike",
+    label: "Edge Spike Knot",
+    shortLabel: "Edge Spike",
+    description:
+      "A spike knot primarily on the narrow edge surface. Only the very tip is " +
+      "visible at the face corner — the majority of the knot runs along the narrow " +
+      "edge. Common in flatsawn boards near the pith.",
+    project: {
+      dimensions: { length_mm: 2400, width_mm: 150, thickness_mm: 25 },
+      knots: [
+        // Main knot on top (narrow edge) surface
         {
-          id: "ro-k5",
+          id: "es-k1",
+          surface: "top",
+          u: 0.68, v: 0.50,
+          diameter_mm: 14, aspect_ratio: 7.0, rotation_deg: 0,
+          shape: "spike", type: "dead", darkness: 0.66,
+        },
+        // Tip barely visible at top-right of front face
+        {
+          id: "es-k2",
           surface: "front",
-          u: 0.84, v: 0.72,
-          diameter_mm: 14, aspect_ratio: 3.2, rotation_deg: -7,
+          u: 0.68, v: 0.02,
+          diameter_mm: 10, aspect_ratio: 2.5, rotation_deg: 88,
           shape: "spike", type: "dead", darkness: 0.62,
         },
       ],
     },
   },
 
-  // ── Row 2: Wide face knots (splay / flat knots) ──────────────────────────
-  // Knots with large d_max relative to d_min — the branch intersects the
-  // face at a shallow angle, creating a wide, flat ellipse.
+  // ── Row 2: Splay knots ───────────────────────────────────────────────────────
+
   {
-    id: "wide-face",
-    label: "Wide Face Knots",
-    description: "Splay knots where the branch hits the face at a shallow angle, producing a wide, flat cross-section. d_max is much larger than d_min.",
+    id: "splay-narrow",
+    label: "Splay Knot — Narrow",
+    shortLabel: "Splay (Narrow)",
+    description:
+      "A splay knot where d_max (across grain) is 2–3× d_min. The branch cut the " +
+      "face at an angle, producing a wide, shallow ellipse. Narrower variant — knot " +
+      "area is still low relative to face area.",
     project: {
       dimensions: { length_mm: 2400, width_mm: 150, thickness_mm: 25 },
       knots: [
         {
-          id: "wf-k1",
+          id: "sn-k1",
           surface: "front",
-          u: 0.17, v: 0.50,
-          diameter_mm: 36, aspect_ratio: 3.6, rotation_deg: 0,
-          shape: "oval", type: "live", darkness: 0.58,
-        },
-        {
-          id: "wf-k2",
-          surface: "front",
-          u: 0.48, v: 0.50,
-          diameter_mm: 42, aspect_ratio: 4.2, rotation_deg: 0,
-          shape: "oval", type: "dead", darkness: 0.72,
-        },
-        {
-          id: "wf-k3",
-          surface: "front",
-          u: 0.79, v: 0.50,
-          diameter_mm: 33, aspect_ratio: 3.3, rotation_deg: 0,
-          shape: "oval", type: "live", darkness: 0.53,
+          u: 0.28, v: 0.50,
+          diameter_mm: 24, aspect_ratio: 2.2, rotation_deg: 0,
+          shape: "oval", type: "live", darkness: 0.55,
         },
       ],
     },
   },
 
-  // ── Row 3: Spike knot (longitudinal / grain-parallel) ───────────────────
-  // A single large spike knot running along the grain. d_min is small,
-  // d_max spans most of the board length. Demonstrates the extreme
-  // aspect ratio Gemini must reason about.
   {
-    id: "spike-longitudinal",
-    label: "Spike Knot",
-    description: "One large spike knot running parallel to the grain. d_max spans most of the board length while d_min is small — a challenging case for graders.",
+    id: "splay-medium",
+    label: "Splay Knot — Medium",
+    shortLabel: "Splay (Medium)",
+    description:
+      "A splay knot where d_max is 3–4× d_min. The flat cross-section begins to " +
+      "occupy a significant fraction of the face width. Often the grade-limiting " +
+      "defect in intermediate-quality boards.",
     project: {
       dimensions: { length_mm: 2400, width_mm: 150, thickness_mm: 25 },
       knots: [
         {
-          id: "sp-k1",
+          id: "sm-k1",
           surface: "front",
-          u: 0.50, v: 0.32,
+          u: 0.50, v: 0.50,
+          diameter_mm: 32, aspect_ratio: 3.6, rotation_deg: 0,
+          shape: "oval", type: "dead", darkness: 0.70,
+        },
+      ],
+    },
+  },
+
+  {
+    id: "splay-wide",
+    label: "Splay Knot — Wide",
+    shortLabel: "Splay (Wide)",
+    description:
+      "A wide splay knot where d_max spans most of the face width. d_max is " +
+      "4–6× d_min. This is a significant defect: the knot weakens the cross-section " +
+      "and often forces a Grade B or C assignment.",
+    project: {
+      dimensions: { length_mm: 2400, width_mm: 150, thickness_mm: 25 },
+      knots: [
+        {
+          id: "sw-k1",
+          surface: "front",
+          u: 0.72, v: 0.50,
+          diameter_mm: 44, aspect_ratio: 4.8, rotation_deg: 0,
+          shape: "oval", type: "dead", darkness: 0.73,
+          tunnel: { exit_kind: "through", exit_diameter_mm: 38, exit_du: 0, exit_dv: 0, depth_factor: 0.5 },
+        },
+      ],
+    },
+  },
+
+  // ── Row 3: Spike knot (longitudinal) ────────────────────────────────────────
+
+  {
+    id: "spike-longitudinal",
+    label: "Spike Knot",
+    shortLabel: "Spike Knot",
+    description:
+      "A spike (grub) knot where the branch ran almost parallel to the board " +
+      "length before being cut. d_max spans much of the board length; d_min is very " +
+      "small. Rare but significant — often missed by visual inspection.",
+    project: {
+      dimensions: { length_mm: 2400, width_mm: 150, thickness_mm: 25 },
+      knots: [
+        {
+          id: "sl-k1",
+          surface: "front",
+          u: 0.50, v: 0.33,
           diameter_mm: 20, aspect_ratio: 10, rotation_deg: 0,
-          shape: "spike", type: "live", darkness: 0.63,
+          shape: "spike", type: "live", darkness: 0.62,
           tunnel: { exit_kind: "through", exit_diameter_mm: 18, exit_du: 0, exit_dv: 0, depth_factor: 0.5 },
         },
       ],
     },
   },
 
-  // ── Row 4: Edge & arris knots ────────────────────────────────────────────
-  // Knots that intersect the edge of the board. Visible on both the face
-  // and the adjacent edge surface. d_min measured on the edge, d_max on
-  // the face. Some are "arris knots" crossing the corner (both face + edge).
+  // ── Row 4: Arris & edge knots ────────────────────────────────────────────────
+
   {
-    id: "edge-arris",
-    label: "Edge / Arris Knots",
-    description: "Knots intersecting the board edge or corner. Each knot appears on both the face and edge surface; some are arris knots crossing two surfaces at once.",
+    id: "arris-single",
+    label: "Arris Knot",
+    shortLabel: "Arris Knot",
+    description:
+      "A knot centred on the arris (long-edge corner) of the board. It appears on " +
+      "both the face and the adjacent edge surface as a roughly triangular shape. " +
+      "d_min is the smaller of the two face measurements.",
     project: {
       dimensions: { length_mm: 2400, width_mm: 150, thickness_mm: 25 },
       knots: [
-        // Arris knot — front face, top edge (v≈0)
         {
-          id: "ea-k1",
+          id: "ar-k1",
           surface: "front",
-          u: 0.18, v: 0.04,
-          diameter_mm: 28, aspect_ratio: 2.2, rotation_deg: 90,
+          u: 0.25, v: 0.03,
+          diameter_mm: 34, aspect_ratio: 2.4, rotation_deg: 86,
           shape: "spike", type: "dead", darkness: 0.70,
         },
-        // Same arris knot visible on top surface
         {
-          id: "ea-k2",
+          id: "ar-k2",
           surface: "top",
-          u: 0.18, v: 0.60,
-          diameter_mm: 22, aspect_ratio: 1.4, rotation_deg: 0,
-          shape: "oval", type: "dead", darkness: 0.65,
-        },
-        // Edge knot — front face, bottom edge (v≈1), with tunnel
-        {
-          id: "ea-k3",
-          surface: "front",
-          u: 0.55, v: 0.97,
-          diameter_mm: 32, aspect_ratio: 2.4, rotation_deg: -88,
-          shape: "spike", type: "live", darkness: 0.58,
-          tunnel: { exit_kind: "through", exit_diameter_mm: 28, exit_du: 0, exit_dv: 0, depth_factor: 0.5 },
-        },
-        // Bottom surface counterpart
-        {
-          id: "ea-k4",
-          surface: "bottom",
-          u: 0.55, v: 0.40,
-          diameter_mm: 26, aspect_ratio: 1.6, rotation_deg: 0,
-          shape: "oval", type: "live", darkness: 0.54,
-        },
-        // Second arris knot, top-right
-        {
-          id: "ea-k5",
-          surface: "front",
-          u: 0.80, v: 0.06,
-          diameter_mm: 24, aspect_ratio: 1.9, rotation_deg: 85,
+          u: 0.25, v: 0.52,
+          diameter_mm: 28, aspect_ratio: 1.8, rotation_deg: 0,
           shape: "oval", type: "dead", darkness: 0.66,
         },
+      ],
+    },
+  },
+
+  {
+    id: "arris-compound",
+    label: "Compound Arris Knot",
+    shortLabel: "Compound Arris",
+    description:
+      "Two adjacent arris knots meeting at the bottom edge, requiring separate " +
+      "d_min1 and d_min2 measurements. The overall d_min is the smaller of the two. " +
+      "Typical in boards with multiple closely spaced branches.",
+    project: {
+      dimensions: { length_mm: 2400, width_mm: 150, thickness_mm: 25 },
+      knots: [
+        // First arris at bottom
         {
-          id: "ea-k6",
+          id: "ac-k1",
+          surface: "front",
+          u: 0.44, v: 0.97,
+          diameter_mm: 30, aspect_ratio: 2.2, rotation_deg: -85,
+          shape: "spike", type: "dead", darkness: 0.68,
+        },
+        {
+          id: "ac-k2",
+          surface: "bottom",
+          u: 0.44, v: 0.48,
+          diameter_mm: 24, aspect_ratio: 1.7, rotation_deg: 0,
+          shape: "oval", type: "dead", darkness: 0.64,
+        },
+        // Second arris adjacent
+        {
+          id: "ac-k3",
+          surface: "front",
+          u: 0.58, v: 0.97,
+          diameter_mm: 26, aspect_ratio: 1.9, rotation_deg: -82,
+          shape: "spike", type: "dead", darkness: 0.66,
+        },
+        {
+          id: "ac-k4",
+          surface: "bottom",
+          u: 0.58, v: 0.52,
+          diameter_mm: 20, aspect_ratio: 1.5, rotation_deg: 0,
+          shape: "oval", type: "dead", darkness: 0.62,
+        },
+      ],
+    },
+  },
+
+  {
+    id: "arris-corner",
+    label: "Corner Arris Knot",
+    shortLabel: "Corner Arris",
+    description:
+      "An arris knot at the end corner of the board, spanning the face, the narrow " +
+      "edge, and the end-grain surface. d_max is measured on the face; d_min on the " +
+      "narrower of the two adjacent surfaces.",
+    project: {
+      dimensions: { length_mm: 2400, width_mm: 150, thickness_mm: 25 },
+      knots: [
+        // Front face, top-right area
+        {
+          id: "ck-k1",
+          surface: "front",
+          u: 0.78, v: 0.04,
+          diameter_mm: 36, aspect_ratio: 2.6, rotation_deg: 84,
+          shape: "spike", type: "dead", darkness: 0.72,
+        },
+        // Top edge
+        {
+          id: "ck-k2",
           surface: "top",
-          u: 0.80, v: 0.55,
-          diameter_mm: 20, aspect_ratio: 1.3, rotation_deg: 0,
+          u: 0.78, v: 0.52,
+          diameter_mm: 28, aspect_ratio: 1.9, rotation_deg: 0,
+          shape: "oval", type: "dead", darkness: 0.67,
+        },
+        // Right end-grain
+        {
+          id: "ck-k3",
+          surface: "right",
+          u: 0.28, v: 0.44,
+          diameter_mm: 22, aspect_ratio: 1.4, rotation_deg: 0,
           shape: "oval", type: "dead", darkness: 0.63,
         },
       ],
     },
+  },
+];
+
+// ── Row groupings for the interactive diagram ────────────────────────────────
+
+export const DIAGRAM_ROWS: DiagramRow[] = [
+  {
+    label: "Face & Edge Spike Knots",
+    subtitle: "Knots visible on the broad face or at the long edge of the board.",
+    caseIds: ["face-spike", "arris-spike", "edge-spike"],
+  },
+  {
+    label: "Splay Knots",
+    subtitle: "Branch cut the face at a shallow angle — wide, flat ellipse. Three size grades.",
+    caseIds: ["splay-narrow", "splay-medium", "splay-wide"],
+  },
+  {
+    label: "Spike Knot",
+    subtitle: "Branch ran almost parallel to the length of the board.",
+    caseIds: ["spike-longitudinal"],
+  },
+  {
+    label: "Arris & Edge Knots",
+    subtitle: "Knots crossing the long or corner edge — visible on two or more surfaces.",
+    caseIds: ["arris-single", "arris-compound", "arris-corner"],
   },
 ];
