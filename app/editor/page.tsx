@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -58,7 +58,7 @@ const ResultPlank3D = dynamic(
 type EditMode = "3d" | "flat";
 type Phase = "edit" | "preview" | "loading" | "results";
 
-export default function EditorPage() {
+function EditorPageInner() {
   // ── Editor state ──────────────────────────────────────────────────────────
   const [dimensions, setDimensions] = useState<PlankDimensions>(DEFAULT_DIMENSIONS);
   const [knots, setKnots] = useState<EditableKnot[]>([]);
@@ -593,5 +593,13 @@ export default function EditorPage() {
         refreshToken={historyToken}
       />
     </div>
+  );
+}
+
+export default function EditorPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-neutral-950" />}>
+      <EditorPageInner />
+    </Suspense>
   );
 }
