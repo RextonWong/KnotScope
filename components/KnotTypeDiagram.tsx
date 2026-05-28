@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Zap, ChevronRight, Layers } from "lucide-react";
+import Link from "next/link";
+import { Zap, ChevronRight, Layers, Pencil } from "lucide-react";
 import { SAMPLE_PRESETS, DIAGRAM_ROWS } from "@/lib/samples";
 import type { SurfaceId } from "@/lib/plank";
 import { SURFACE_IDS } from "@/lib/plank";
@@ -150,6 +151,32 @@ const SHAPES: Record<string, React.ReactNode> = {
   ),
 };
 
+// ── Surface tile helper ───────────────────────────────────────────────────────
+
+function SurfaceTile({ label, b64, height }: { label: string; b64?: string; height: number }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-[10px] text-neutral-500 uppercase tracking-wider">{label}</span>
+      {b64 ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={`data:image/jpeg;base64,${b64}`}
+          alt={label}
+          className="w-full border border-neutral-800 bg-neutral-950"
+          style={{ height, objectFit: "cover", objectPosition: "center" }}
+        />
+      ) : (
+        <div
+          className="w-full bg-neutral-800 border border-neutral-700 flex items-center justify-center"
+          style={{ height }}
+        >
+          <span className="text-[9px] text-neutral-600">—</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Detail panel — images + analyze button ───────────────────────────────────
 
 interface DetailPanelProps {
@@ -213,45 +240,40 @@ function DetailPanel({ presetId, onAnalyze, analyzing }: DetailPanelProps) {
       </div>
 
       {/* 6 surface images */}
-      <div className="px-5 py-4">
-        <p className="text-xs uppercase tracking-widest text-neutral-600 mb-3">
+      <div className="px-5 py-4 flex flex-col gap-2">
+        <p className="text-xs uppercase tracking-widest text-neutral-600">
           Example — 6 rendered surfaces
         </p>
-        {loading && !allLoaded ? (
-          <div className="h-20 flex items-center justify-center">
-            <span className="text-xs text-neutral-600 animate-pulse">Loading surface images…</span>
+
+        {loading && !Object.keys(images).length ? (
+          <div className="h-16 flex items-center justify-center">
+            <span className="text-xs text-neutral-600 animate-pulse">Loading…</span>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {(["front", "back", "top", "bottom", "left", "right"] as SurfaceId[]).map((sid) => (
-              <div key={sid} className="flex flex-col gap-1">
-                <span className="text-[10px] text-neutral-500 uppercase tracking-wider">
-                  {SURFACE_LABELS[sid]}
-                </span>
-                {images[sid] ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={`data:image/jpeg;base64,${images[sid]}`}
-                    alt={`${sid} surface`}
-                    className="w-full object-cover border border-neutral-800 bg-neutral-950"
-                    style={{ aspectRatio: sid === "front" || sid === "back" ? "16/1" : sid === "top" || sid === "bottom" ? "96/6" : "6/1" }}
-                  />
-                ) : (
-                  <div
-                    className="w-full bg-neutral-800 border border-neutral-700 flex items-center justify-center"
-                    style={{ aspectRatio: "8/1" }}
-                  >
-                    <span className="text-[9px] text-neutral-600">not generated</span>
-                  </div>
-                )}
-              </div>
-            ))}
+          <div className="flex flex-col gap-2">
+
+            {/* Front — full width, fixed height crop */}
+            <SurfaceTile label="Front" b64={images.front} height={90} />
+            {/* Back — full width, fixed height crop */}
+            <SurfaceTile label="Back" b64={images.back} height={90} />
+
+            {/* Top + Bottom side by side (thin edges) */}
+            <div className="grid grid-cols-2 gap-2">
+              <SurfaceTile label="Top" b64={images.top} height={30} />
+              <SurfaceTile label="Bottom" b64={images.bottom} height={30} />
+            </div>
+
+            {/* Left + Right side by side (end grain) */}
+            <div className="grid grid-cols-2 gap-2">
+              <SurfaceTile label="Left" b64={images.left} height={70} />
+              <SurfaceTile label="Right" b64={images.right} height={70} />
+            </div>
           </div>
         )}
       </div>
 
-      {/* Analyze button */}
-      <div className="px-5 pb-5">
+      {/* Action buttons */}
+      <div className="px-5 pb-5 flex flex-col gap-2">
         <button
           type="button"
           disabled={!allLoaded || analyzing}
@@ -263,9 +285,19 @@ function DetailPanel({ presetId, onAnalyze, analyzing }: DetailPanelProps) {
           <Zap size={15} />
           {analyzing ? "Analysing…" : allLoaded ? "Analyse with AI →" : "Loading images…"}
         </button>
+
+        <Link
+          href={`/editor?preset=${presetId}`}
+          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-neutral-700
+            text-neutral-300 text-sm font-medium hover:border-amber-500/50 hover:text-amber-300 transition-colors"
+        >
+          <Pencil size={14} />
+          Edit this example in the Editor
+        </Link>
+
         {!allLoaded && !loading && (
-          <p className="text-[10px] text-neutral-600 text-center mt-2">
-            Sample images not yet generated — run <code className="bg-neutral-800 px-1 rounded">/generate-samples</code> in dev.
+          <p className="text-[10px] text-neutral-600 text-center">
+            Images not yet generated — run <code className="bg-neutral-800 px-1 rounded">/generate-samples</code> in dev.
           </p>
         )}
       </div>
