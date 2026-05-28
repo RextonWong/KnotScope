@@ -1,26 +1,58 @@
 [
   {
-    "id": "board-01",
-    "species": "Pine",
-    "front": "/samples/board-01-front.jpg",
-    "back": "/samples/board-01-back.jpg"
+    "id": "round-oval",
+    "label": "Round / Oval",
+    "kind": "6face",
+    "description": "Small discrete knots — round, oval, and spike (lancet) variants. The paired round knot demonstrates through-knot detection.",
+    "surfaces": {
+      "front": "/samples/round-oval-front.jpg",
+      "back": "/samples/round-oval-back.jpg",
+      "top": "/samples/round-oval-top.jpg",
+      "bottom": "/samples/round-oval-bottom.jpg",
+      "left": "/samples/round-oval-left.jpg",
+      "right": "/samples/round-oval-right.jpg"
+    }
   },
   {
-    "id": "board-02",
-    "species": "Oak",
-    "front": "/samples/board-02-front.jpg",
-    "back": "/samples/board-02-back.jpg"
+    "id": "wide-face",
+    "label": "Wide Face Knots",
+    "kind": "6face",
+    "description": "Splay knots where the branch hits the face at a shallow angle, producing a wide, flat cross-section. d_max is much larger than d_min.",
+    "surfaces": {
+      "front": "/samples/wide-face-front.jpg",
+      "back": "/samples/wide-face-back.jpg",
+      "top": "/samples/wide-face-top.jpg",
+      "bottom": "/samples/wide-face-bottom.jpg",
+      "left": "/samples/wide-face-left.jpg",
+      "right": "/samples/wide-face-right.jpg"
+    }
   },
   {
-    "id": "board-03",
-    "species": "Fir",
-    "front": "/samples/board-03-front.jpg",
-    "back": "/samples/board-03-back.jpg"
+    "id": "spike-longitudinal",
+    "label": "Spike Knot",
+    "kind": "6face",
+    "description": "One large spike knot running parallel to the grain. d_max spans most of the board length while d_min is small — a challenging case for graders.",
+    "surfaces": {
+      "front": "/samples/spike-longitudinal-front.jpg",
+      "back": "/samples/spike-longitudinal-back.jpg",
+      "top": "/samples/spike-longitudinal-top.jpg",
+      "bottom": "/samples/spike-longitudinal-bottom.jpg",
+      "left": "/samples/spike-longitudinal-left.jpg",
+      "right": "/samples/spike-longitudinal-right.jpg"
+    }
   },
   {
-    "id": "board-04",
-    "species": "Spruce",
-    "front": "/samples/board-04-front.jpg",
-    "back": "/samples/board-04-back.jpg"
+    "id": "edge-arris",
+    "label": "Edge / Arris Knots",
+    "kind": "6face",
+    "description": "Knots intersecting the board edge or corner. Each knot appears on both the face and edge surface; some are arris knots crossing two surfaces at once.",
+    "surfaces": {
+      "front": "/samples/edge-arris-front.jpg",
+      "back": "/samples/edge-arris-back.jpg",
+      "top": "/samples/edge-arris-top.jpg",
+      "bottom": "/samples/edge-arris-bottom.jpg",
+      "left": "/samples/edge-arris-left.jpg",
+      "right": "/samples/edge-arris-right.jpg"
+    }
   }
 ]

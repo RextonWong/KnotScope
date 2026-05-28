@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -16,6 +17,7 @@ import {
   ImageIcon,
   ChevronLeft,
   History,
+  BookOpen,
 } from "lucide-react";
 import type {
   EditableKnot,
@@ -26,6 +28,7 @@ import {
   DEFAULT_DIMENSIONS,
   SURFACE_IDS,
 } from "@/lib/plank";
+import { SAMPLE_PRESETS } from "@/lib/samples";
 import type { Analysis6 } from "@/lib/schema";
 import { renderAllSurfaces } from "@/lib/renderSurface";
 import { GradeCard } from "@/components/GradeCard";
@@ -73,6 +76,22 @@ export default function EditorPage() {
   // ── History ───────────────────────────────────────────────────────────────
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyToken, setHistoryToken] = useState(0);
+
+  // ── Sample preset loader (?preset=<id> in URL) ────────────────────────────
+  const searchParams = useSearchParams();
+  const [samplesOpen, setSamplesOpen] = useState(false);
+  useEffect(() => {
+    const presetId = searchParams.get("preset");
+    if (!presetId) return;
+    const preset = SAMPLE_PRESETS.find((p) => p.id === presetId);
+    if (!preset) return;
+    setDimensions(preset.project.dimensions);
+    setKnots(preset.project.knots);
+    setSelectedKnotId(null);
+    setPhase("edit");
+  // Only run once on mount (searchParams is stable on first render).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Knot ops ──────────────────────────────────────────────────────────────
   const addKnot = useCallback((knot: EditableKnot) => {
@@ -256,10 +275,47 @@ export default function EditorPage() {
         <Boxes size={18} className="text-amber-500" />
         <span className="font-bold tracking-tight">6-Surface Plank Editor</span>
         <span className="hidden sm:inline text-xs text-neutral-600 ml-2">Demo: AI through-knot reasoning</span>
+
+        {/* Sample presets dropdown */}
+        <div className="ml-auto relative">
+          <button
+            type="button"
+            onClick={() => setSamplesOpen((o) => !o)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-amber-500/40 text-amber-400 hover:border-amber-500 hover:bg-amber-500/10 text-xs font-medium transition-colors"
+          >
+            <BookOpen size={14} />
+            Load Sample
+          </button>
+          {samplesOpen && (
+            <div className="absolute right-0 top-full mt-1 z-50 w-64 bg-neutral-900 border border-neutral-800 rounded-xl shadow-2xl overflow-hidden">
+              <p className="px-3 pt-2.5 pb-1.5 text-[10px] uppercase tracking-widest text-neutral-600 font-medium">
+                Fig 6 Knot Types
+              </p>
+              {SAMPLE_PRESETS.map((preset) => (
+                <button
+                  key={preset.id}
+                  type="button"
+                  onClick={() => {
+                    setDimensions(preset.project.dimensions);
+                    setKnots(preset.project.knots);
+                    setSelectedKnotId(null);
+                    setPhase("edit");
+                    setSamplesOpen(false);
+                  }}
+                  className="w-full px-3 py-2.5 text-left hover:bg-neutral-800 transition-colors flex flex-col gap-0.5"
+                >
+                  <span className="text-sm font-medium text-neutral-200">{preset.label}</span>
+                  <span className="text-[10px] text-neutral-500 leading-snug line-clamp-2">{preset.description}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         <button
           type="button"
           onClick={() => setHistoryOpen(true)}
-          className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-800 text-neutral-400 hover:border-neutral-600 hover:text-neutral-200 text-xs font-medium transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-800 text-neutral-400 hover:border-neutral-600 hover:text-neutral-200 text-xs font-medium transition-colors"
         >
           <History size={14} />
           History

@@ -9,13 +9,18 @@ import { KnotDetailPanel } from "@/components/KnotDetailPanel";
 import { LoadingState } from "@/components/LoadingState";
 import { SampleBoards } from "@/components/SampleBoards";
 import { bboxCenter } from "@/lib/bbox";
-import { TreePine, Zap, RotateCcw, Download, PanelRight, History, FileJson, Boxes } from "lucide-react";
+import { TreePine, Zap, RotateCcw, Download, PanelRight, History, FileJson, Boxes, Layers } from "lucide-react";
 import Link from "next/link";
-import type { Analysis } from "@/lib/schema";
+import type { Analysis, Analysis6 } from "@/lib/schema";
+import type { SurfaceId } from "@/lib/plank";
+import { SURFACE_IDS } from "@/lib/plank";
 import { HistoryPanel } from "@/components/HistoryPanel";
+import { SurfaceGallery } from "@/components/editor/SurfaceGallery";
+import { DetailedAnalysisPanel } from "@/components/editor/DetailedAnalysisPanel";
 import { generateThumbnail, saveRecord, exportRecordJson, type HistoryRecord } from "@/lib/history";
 
 type AppState = "empty" | "loading" | "results";
+type AnalysisMode = "2face" | "6face";
 
 // Base64 string → bytes → detect MIME from magic bytes
 function detectMime(b64: string): string {
@@ -161,6 +166,9 @@ function PairOverlay({
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function Home() {
+  const [mode, setMode] = useState<AnalysisMode>("2face");
+
+  // ── 2-face state ──────────────────────────────────────────────────────────
   const [state, setState] = useState<AppState>("empty");
   const [frontImage, setFrontImage] = useState<string | null>(null);
   const [backImage, setBackImage] = useState<string | null>(null);
@@ -173,6 +181,12 @@ export default function Home() {
   const [historyToken, setHistoryToken] = useState(0);
   const boardIdRef = useRef(`board-${Date.now()}`);
   const currentRecordRef = useRef<HistoryRecord | null>(null);
+
+  // ── 6-face state ──────────────────────────────────────────────────────────
+  const [state6, setState6] = useState<AppState>("empty");
+  const [images6, setImages6] = useState<Partial<Record<SurfaceId, string>>>({});
+  const [analysis6, setAnalysis6] = useState<Analysis6 | null>(null);
+  const [selected6, setSelected6] = useState<{ surface: SurfaceId; id: number } | null>(null);
 
   const canAnalyze = frontImage !== null && backImage !== null;
   const frontMime = frontImage ? detectMime(frontImage) : "image/jpeg";
@@ -259,6 +273,42 @@ export default function Home() {
     setHoveredKnot(null);
     setDetailOpen(false);
     currentRecordRef.current = null;
+  };
+
+  // ── 6-face analyze ────────────────────────────────────────────────────────
+  const canAnalyze6 = SURFACE_IDS.every((s) => images6[s] != null);
+
+  const handleAnalyze6 = async () => {
+    if (!canAnalyze6) return;
+    setState6("loading");
+    setSelected6(null);
+    try {
+      const res = await fetch("/api/analyze6", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          surfaces: Object.fromEntries(
+            SURFACE_IDS.map((s) => [s, { base64: images6[s], mime: "image/jpeg" }])
+          ),
+          dimensions: { length_mm: 2400, width_mm: 150, thickness_mm: 25 },
+        }),
+      });
+      const data = await res.json() as unknown;
+      if (!res.ok) throw new Error((data as { error?: string }).error ?? "Analysis failed");
+      setAnalysis6(data as Analysis6);
+      setState6("results");
+      toast.success(`Grade ${(data as Analysis6).estimated_grade} — ${(data as Analysis6).total_knots} knots found.`, { duration: 5000 });
+    } catch (err) {
+      toast.error(`Analysis failed: ${err instanceof Error ? err.message : "Unknown error"}`);
+      setState6("empty");
+    }
+  };
+
+  const handleReset6 = () => {
+    setState6("empty");
+    setImages6({});
+    setAnalysis6(null);
+    setSelected6(null);
   };
 
   const handleRestore = (record: HistoryRecord) => {
@@ -361,8 +411,40 @@ export default function Home() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
 
-        {/* ── EMPTY STATE ── */}
-        {state === "empty" && (
+        {/* ── MODE TOGGLE (always visible in empty/results) ── */}
+        {(state === "empty" || state6 === "empty") && state !== "loading" && state6 !== "loading" && (
+          <div className="flex justify-center mb-8">
+            <div className="flex rounded-xl border border-neutral-800 overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setMode("2face")}
+                className={`flex items-center gap-2 px-5 py-2.5 text-sm font-medium transition-colors ${
+                  mode === "2face"
+                    ? "bg-amber-500 text-neutral-950"
+                    : "text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800"
+                }`}
+              >
+                <Layers size={15} />
+                2 Faces
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode("6face")}
+                className={`flex items-center gap-2 px-5 py-2.5 text-sm font-medium transition-colors ${
+                  mode === "6face"
+                    ? "bg-amber-500 text-neutral-950"
+                    : "text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800"
+                }`}
+              >
+                <Boxes size={15} />
+                6 Faces
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── 2-FACE EMPTY STATE ── */}
+        {mode === "2face" && state === "empty" && (
           <div className="flex flex-col items-center gap-8 sm:gap-10">
             <div className="text-center max-w-lg">
               <h1 className="text-3xl sm:text-4xl font-black tracking-tight mb-3">KnotScope</h1>
@@ -377,7 +459,7 @@ export default function Home() {
               <DropZone label="Back Face" value={backImage} onChange={setBackImage} />
             </div>
 
-            <SampleBoards onSelect={(f, b) => { setFrontImage(f); setBackImage(b); }} />
+            <SampleBoards onSelect2Face={(f, b) => { setFrontImage(f); setBackImage(b); }} />
 
             <Link
               href="/editor"
@@ -408,8 +490,55 @@ export default function Home() {
           </div>
         )}
 
+        {/* ── 6-FACE EMPTY STATE ── */}
+        {mode === "6face" && state6 === "empty" && (
+          <div className="flex flex-col items-center gap-8 sm:gap-10">
+            <div className="text-center max-w-lg">
+              <h1 className="text-3xl sm:text-4xl font-black tracking-tight mb-3">6-Face Analysis</h1>
+              <p className="text-neutral-400 leading-relaxed text-sm sm:text-base">
+                Upload photos of all six surfaces of a plank. AI detects knots on each face,
+                identifies through-knot pairs, and grades the board with a full structural report.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 w-full max-w-2xl">
+              {SURFACE_IDS.map((sid) => (
+                <DropZone
+                  key={sid}
+                  label={sid.charAt(0).toUpperCase() + sid.slice(1) + " Face"}
+                  value={images6[sid] ?? null}
+                  onChange={(v) => setImages6((prev) => ({ ...prev, [sid]: v ?? undefined }))}
+                />
+              ))}
+            </div>
+
+            <SampleBoards />
+
+            <Link
+              href="/editor"
+              className="flex items-center gap-2.5 px-5 py-3 rounded-xl border border-amber-500/30 bg-amber-500/5 text-amber-300 hover:bg-amber-500/10 hover:border-amber-500/50 transition-colors text-sm"
+            >
+              <Boxes size={16} />
+              <span>
+                Or render surfaces from the <strong className="font-bold text-amber-200">6-Surface Editor</strong> &rarr;
+              </span>
+            </Link>
+
+            <button
+              type="button"
+              onClick={handleAnalyze6}
+              disabled={!canAnalyze6}
+              className="flex items-center gap-2 px-8 py-4 rounded-xl bg-amber-500 text-neutral-950 font-bold text-base
+                hover:bg-amber-400 active:scale-[0.98] transition-all disabled:opacity-30 disabled:cursor-not-allowed min-h-[56px]"
+            >
+              <Zap size={18} />
+              Analyze 6 Faces
+            </button>
+          </div>
+        )}
+
         {/* ── LOADING STATE ── */}
-        {state === "loading" && <LoadingState />}
+        {(state === "loading" || state6 === "loading") && <LoadingState />}
 
         {/* ── RESULTS STATE ── */}
         {state === "results" && analysis && frontImage && backImage && (
@@ -486,6 +615,48 @@ export default function Home() {
               <button
                 type="button"
                 onClick={handleReset}
+                className="flex items-center gap-2 px-5 sm:px-6 py-3 rounded-xl border border-neutral-700 text-neutral-300 font-semibold
+                  hover:border-neutral-500 hover:text-neutral-100 active:scale-[0.98] transition-all min-h-[44px]"
+              >
+                <RotateCcw size={16} />
+                Analyze Another Board
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── 6-FACE RESULTS STATE ── */}
+        {mode === "6face" && state6 === "results" && analysis6 && (
+          <div className="flex flex-col gap-6 sm:gap-8">
+            <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 items-start">
+              <div className="flex-1">
+                <h2 className="text-xl sm:text-2xl font-bold mb-1">6-Face Analysis Complete</h2>
+                <p className="text-neutral-500 text-sm">All six surfaces analyzed for knots and through-knot pairs.</p>
+              </div>
+              <div className="w-full sm:w-72">
+                <GradeCard analysis={analysis6 as unknown as Analysis} />
+              </div>
+            </div>
+
+            <SurfaceGallery
+              dimensions={{ length_mm: 2400, width_mm: 150, thickness_mm: 25 }}
+              surfaceImages={images6 as Record<SurfaceId, string>}
+              analysis={analysis6}
+              selectedKnot={selected6}
+              onSelectKnot={setSelected6}
+            />
+
+            {analysis6.detailed_analysis && (
+              <DetailedAnalysisPanel
+                headline={analysis6.reasoning}
+                detail={analysis6.detailed_analysis}
+              />
+            )}
+
+            <div className="flex gap-3 flex-wrap">
+              <button
+                type="button"
+                onClick={handleReset6}
                 className="flex items-center gap-2 px-5 sm:px-6 py-3 rounded-xl border border-neutral-700 text-neutral-300 font-semibold
                   hover:border-neutral-500 hover:text-neutral-100 active:scale-[0.98] transition-all min-h-[44px]"
               >
