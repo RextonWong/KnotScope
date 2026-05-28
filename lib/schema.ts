@@ -47,6 +47,15 @@ export const Pair6Schema = z.object({
   confidence: z.number().min(0).max(1),
 });
 
+export const DetailedAnalysisSchema = z.object({
+  overall: z.string(),
+  notable_defects: z.array(z.string()),
+  through_knot_discussion: z.string(),
+  grade_criteria_applied: z.string(),
+  structural_assessment: z.string(),
+  recommendations: z.string(),
+});
+
 export const Analysis6Schema = z.object({
   is_lumber: z.boolean(),
   surfaces: SurfaceKnotsSchema,
@@ -56,7 +65,10 @@ export const Analysis6Schema = z.object({
   max_knot_diameter_mm: z.number().int(),
   estimated_grade: z.enum(["Select", "A", "B", "C", "Reject"]),
   reasoning: z.string(),
+  detailed_analysis: DetailedAnalysisSchema,
 });
+
+export type DetailedAnalysis = z.infer<typeof DetailedAnalysisSchema>;
 
 export type SurfaceKnots = z.infer<typeof SurfaceKnotsSchema>;
 export type Pair6 = z.infer<typeof Pair6Schema>;

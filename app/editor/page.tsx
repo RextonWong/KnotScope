@@ -15,6 +15,7 @@ import {
   Download,
   ImageIcon,
   ChevronLeft,
+  History,
 } from "lucide-react";
 import type {
   EditableKnot,
@@ -33,6 +34,9 @@ import { KnotInspector } from "@/components/editor/KnotInspector";
 import { PlankSizePanel } from "@/components/editor/PlankSizePanel";
 import { SurfaceFlatEditor } from "@/components/editor/SurfaceFlatEditor";
 import { SurfaceGallery } from "@/components/editor/SurfaceGallery";
+import { DetailedAnalysisPanel } from "@/components/editor/DetailedAnalysisPanel";
+import { EditorHistoryPanel } from "@/components/editor/EditorHistoryPanel";
+import { generateThumbnail, save6FaceRecord, type SixFaceRecord } from "@/lib/history";
 
 // R3F components — client-only to avoid SSR Three.js issues
 const Plank3D = dynamic(
@@ -65,6 +69,10 @@ export default function EditorPage() {
   const [surfaceImages, setSurfaceImages] = useState<Record<SurfaceId, string> | null>(null);
   const [resultSelected, setResultSelected] = useState<{ surface: SurfaceId; id: number } | null>(null);
   const boardIdRef = useRef(`plank-${Date.now()}`);
+
+  // ── History ───────────────────────────────────────────────────────────────
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyToken, setHistoryToken] = useState(0);
 
   // ── Knot ops ──────────────────────────────────────────────────────────────
   const addKnot = useCallback((knot: EditableKnot) => {
@@ -154,6 +162,25 @@ export default function EditorPage() {
           ? "No knots detected — clean plank."
           : `Grade ${result.estimated_grade} — ${result.total_knots} knots, ${result.through_knot_count} through-knot${result.through_knot_count !== 1 ? "s" : ""}.`;
       toast.success(summary, { duration: 5000 });
+
+      // Save to history — thumbnails generated async, non-blocking
+      (async () => {
+        const thumbs = {} as Record<SurfaceId, string>;
+        for (const s of SURFACE_IDS) {
+          thumbs[s] = await generateThumbnail(surfaceImages[s], "image/jpeg", 220);
+        }
+        const record: SixFaceRecord = {
+          id: boardIdRef.current,
+          boardId: boardIdRef.current,
+          timestamp: new Date().toISOString(),
+          dimensions,
+          knots,
+          analysis: result,
+          thumbs,
+        };
+        save6FaceRecord(record);
+        setHistoryToken((t) => t + 1);
+      })();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error";
       toast.error(`Analysis failed: ${msg}`);
@@ -165,6 +192,21 @@ export default function EditorPage() {
     setPhase("edit");
     setResultSelected(null);
   };
+
+  const handleRestoreFromHistory = useCallback((record: SixFaceRecord) => {
+    // Restore enough state to show the result phase: dims, knots, analysis,
+    // and the thumb-resolution images (3D textures will look softer than fresh
+    // renders, which is fine for a historical record). The user can hit
+    // "Back to Editor" and "Regenerate" to get full-res renders again.
+    setDimensions(record.dimensions);
+    setKnots(record.knots);
+    setSelectedKnotId(null);
+    setAnalysis(record.analysis);
+    setSurfaceImages(record.thumbs);
+    boardIdRef.current = record.boardId;
+    setResultSelected(null);
+    setPhase("results");
+  }, []);
 
   const handleClearAll = () => {
     setKnots([]);
@@ -214,6 +256,14 @@ export default function EditorPage() {
         <Boxes size={18} className="text-amber-500" />
         <span className="font-bold tracking-tight">6-Surface Plank Editor</span>
         <span className="hidden sm:inline text-xs text-neutral-600 ml-2">Demo: AI through-knot reasoning</span>
+        <button
+          type="button"
+          onClick={() => setHistoryOpen(true)}
+          className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-800 text-neutral-400 hover:border-neutral-600 hover:text-neutral-200 text-xs font-medium transition-colors"
+        >
+          <History size={14} />
+          History
+        </button>
       </nav>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
@@ -349,7 +399,7 @@ export default function EditorPage() {
                     onSelectSurface={setActiveSurface}
                   />
                 ) : (
-                  <div className="w-full h-full p-3 overflow-auto">
+                  <div className="w-full h-full p-4 overflow-auto flex items-center justify-center">
                     <SurfaceFlatEditor
                       surface={activeSurface}
                       dimensions={dimensions}
@@ -441,11 +491,11 @@ export default function EditorPage() {
               />
             </div>
 
-            {/* Reasoning + actions */}
-            <div className="rounded-2xl border border-neutral-800 bg-neutral-900 p-5">
-              <p className="text-xs uppercase tracking-wider text-neutral-500 mb-2">AI reasoning</p>
-              <p className="text-sm text-neutral-300 italic leading-relaxed">{analysis.reasoning}</p>
-            </div>
+            {/* Detailed AI report */}
+            <DetailedAnalysisPanel
+              headline={analysis.reasoning}
+              detail={analysis.detailed_analysis}
+            />
 
             <div className="flex gap-3 flex-wrap">
               <button
@@ -479,6 +529,13 @@ export default function EditorPage() {
           </div>
         )}
       </main>
+
+      <EditorHistoryPanel
+        open={historyOpen}
+        onOpenChange={setHistoryOpen}
+        onRestore={handleRestoreFromHistory}
+        refreshToken={historyToken}
+      />
     </div>
   );
 }

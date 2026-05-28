@@ -88,7 +88,10 @@ function buildFaces(dims: PlankDimensions): FaceConfig[] {
     {
       id: "left",
       position: [-half.L, 0, 0],
-      rotation: [0, -Math.PI / 2, 0],
+      // Rotation chosen so plane local-x runs along world -y (=W axis) and
+      // plane local-y runs along world +z (=T axis). Normal faces world -x.
+      // This matches the actual LEFT face shape on the box.
+      rotation: [Math.PI / 2, -Math.PI / 2, 0],
       width: W,
       height: T,
       uvFromLocal: (lx, ly) => ({ u: lx / W + 0.5, v: 0.5 - ly / T }),
@@ -97,7 +100,8 @@ function buildFaces(dims: PlankDimensions): FaceConfig[] {
     {
       id: "right",
       position: [half.L, 0, 0],
-      rotation: [0, Math.PI / 2, 0],
+      // Mirror of LEFT — plane local-x runs along world +y, normal faces +x.
+      rotation: [Math.PI / 2, Math.PI / 2, 0],
       width: W,
       height: T,
       uvFromLocal: (lx, ly) => ({ u: lx / W + 0.5, v: 0.5 - ly / T }),

@@ -280,7 +280,7 @@ function SurfaceTile({
       <div
         ref={setRefs}
         onClick={handleClick}
-        className="relative rounded-xl overflow-hidden border border-neutral-800 bg-neutral-900 cursor-pointer"
+        className="relative overflow-hidden border border-neutral-800 bg-neutral-900 cursor-pointer"
         style={{ aspectRatio: `${ar}` }}
       >
         {image ? (

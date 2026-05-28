@@ -171,12 +171,14 @@ export function SurfaceFlatEditor({
     document.body.style.userSelect = "none";
   };
 
+  // Cap visual height so very long faces don't dominate, then derive max-width
+  // from aspect ratio. The wrapper centers the canvas horizontally.
   return (
     <div
       ref={containerRef}
       onClick={handleCanvasClick}
-      className="relative w-full bg-neutral-900 rounded-xl overflow-hidden border border-neutral-800"
-      style={{ aspectRatio: `${ar}` }}
+      className="relative bg-neutral-900 overflow-hidden border border-neutral-800 mx-auto"
+      style={{ aspectRatio: `${ar}`, width: "100%", maxHeight: "70vh", maxWidth: `min(100%, calc(70vh * ${ar}))` }}
     >
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none" />
 

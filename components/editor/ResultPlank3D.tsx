@@ -64,12 +64,15 @@ function buildFaces(dims: PlankDimensions): Record<SurfaceId, FaceMeta> {
       (u, v) => new THREE.Vector3((u - 0.5) * L, -halfW, (0.5 - v) * T)
     ),
     left: make(
-      "left", [-halfL, 0, 0], [0, -Math.PI / 2, 0], W, T,
-      (u, v) => new THREE.Vector3(-halfL, (0.5 - v) * T, -(u - 0.5) * W)
+      "left", [-halfL, 0, 0], [Math.PI / 2, -Math.PI / 2, 0], W, T,
+      // u (image x) runs along world -y (so u=1 is on viewer's right when
+      // looking at the face from -x). v (image y, downward) runs along world -z.
+      (u, v) => new THREE.Vector3(-halfL, (0.5 - u) * W, (0.5 - v) * T)
     ),
     right: make(
-      "right", [halfL, 0, 0], [0, Math.PI / 2, 0], W, T,
-      (u, v) => new THREE.Vector3(halfL, (0.5 - v) * T, (u - 0.5) * W)
+      "right", [halfL, 0, 0], [Math.PI / 2, Math.PI / 2, 0], W, T,
+      // Mirror: u runs along world +y, v runs along world -z (same as LEFT).
+      (u, v) => new THREE.Vector3(halfL, (u - 0.5) * W, (0.5 - v) * T)
     ),
   };
 }

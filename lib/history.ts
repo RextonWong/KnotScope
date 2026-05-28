@@ -1,4 +1,5 @@
-import type { Analysis } from "@/lib/schema";
+import type { Analysis, Analysis6 } from "@/lib/schema";
+import type { EditableKnot, PlankDimensions, SurfaceId } from "@/lib/plank";
 
 export interface HistoryRecord {
   id: string;
@@ -13,6 +14,21 @@ export interface HistoryRecord {
 
 const STORAGE_KEY = "knotscope_history";
 const MAX_RECORDS = 20;
+
+// ── 6-surface history (separate key, separate cap because records are bigger) ──
+
+export interface SixFaceRecord {
+  id: string;
+  boardId: string;
+  timestamp: string;
+  dimensions: PlankDimensions;
+  knots: EditableKnot[];
+  analysis: Analysis6;
+  thumbs: Record<SurfaceId, string>;
+}
+
+const SIX_STORAGE_KEY = "knotscope_history_6face";
+const MAX_6FACE_RECORDS = 15;
 
 export function loadHistory(): HistoryRecord[] {
   if (typeof window === "undefined") return [];
@@ -130,4 +146,78 @@ export function exportAllJson(records: HistoryRecord[]): void {
     records: records.map(buildExportJson),
   };
   triggerDownload(`knotscope-history-${Date.now()}.json`, payload);
+}
+
+// ── 6-face history API ───────────────────────────────────────────────────────
+
+export function load6FaceHistory(): SixFaceRecord[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(SIX_STORAGE_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as SixFaceRecord[];
+  } catch {
+    return [];
+  }
+}
+
+export function save6FaceRecord(record: SixFaceRecord): void {
+  const all = load6FaceHistory();
+  const updated = [record, ...all.filter((r) => r.id !== record.id)].slice(0, MAX_6FACE_RECORDS);
+  try {
+    localStorage.setItem(SIX_STORAGE_KEY, JSON.stringify(updated));
+  } catch {
+    const trimmed = updated.slice(0, 8);
+    try {
+      localStorage.setItem(SIX_STORAGE_KEY, JSON.stringify(trimmed));
+    } catch {
+      /* storage unavailable */
+    }
+  }
+}
+
+export function delete6FaceRecord(id: string): void {
+  const all = load6FaceHistory().filter((r) => r.id !== id);
+  try { localStorage.setItem(SIX_STORAGE_KEY, JSON.stringify(all)); } catch { /* ignore */ }
+}
+
+export function clear6FaceHistory(): void {
+  try { localStorage.removeItem(SIX_STORAGE_KEY); } catch { /* ignore */ }
+}
+
+function build6FaceExportJson(record: SixFaceRecord): object {
+  const { analysis, dimensions, boardId, timestamp } = record;
+  return {
+    knotscope_version: "1.0",
+    kind: "6-surface",
+    exported_at: new Date().toISOString(),
+    board_id: boardId,
+    analyzed_at: timestamp,
+    dimensions,
+    summary: {
+      estimated_grade: analysis.estimated_grade,
+      total_knots: analysis.total_knots,
+      through_knot_count: analysis.through_knot_count,
+      max_knot_diameter_mm: analysis.max_knot_diameter_mm,
+      reasoning: analysis.reasoning,
+    },
+    surfaces: analysis.surfaces,
+    through_knot_pairs: analysis.pairs,
+    detailed_analysis: analysis.detailed_analysis,
+  };
+}
+
+export function export6FaceRecordJson(record: SixFaceRecord): void {
+  triggerDownload(`knotscope-6surface-${record.boardId}.json`, build6FaceExportJson(record));
+}
+
+export function exportAll6FaceJson(records: SixFaceRecord[]): void {
+  const payload = {
+    knotscope_version: "1.0",
+    kind: "6-surface-bundle",
+    exported_at: new Date().toISOString(),
+    record_count: records.length,
+    records: records.map(build6FaceExportJson),
+  };
+  triggerDownload(`knotscope-6surface-history-${Date.now()}.json`, payload);
 }

@@ -62,13 +62,55 @@ GRADING
       "B": some defects but structurally sound for general construction
       "C": large dead knots or holes — decorative / non-structural only
       "Reject": severe defects, splits, or knot area over 25%
-  - reasoning: 1–2 sentences explaining the grade
+  - reasoning: 1 short sentence summary (will be shown as a headline)
+
+DETAILED ANALYSIS — required, must be substantive
+Produce a multi-section technical report. Every section must be SPECIFIC and
+reference actual measurements, knot IDs, and surface names from your detection
+output above. Generic statements like "the board has some knots" are NOT acceptable.
+
+  - overall (2-4 sentences): Comprehensive condition summary. Include total knot
+    count, through-knot count, surface coverage (which faces have knots), worst
+    defect (cite specific knot ID, surface, type, diameter), and what immediately
+    stands out about this plank.
+
+  - notable_defects (array of 1-6 bullet strings): Call out specific high-impact
+    knots/holes individually. Format each bullet as:
+      "Knot #<id> on the <surface> face — <type> <diameter>mm — <one-line reason it matters>"
+    Examples:
+      "Knot #2 on the front face — dead 38mm — exceeds 30mm threshold, precludes Grade A."
+      "Knot-hole #0 on the top edge — 22mm through-hole paired with back #3, weakens cross-section."
+    If there are zero meaningful defects, return a single bullet stating so.
+
+  - through_knot_discussion (2-4 sentences): How many through-knots were detected
+    and on which axis (thickness, width, length). Are they clustered or scattered?
+    Cite the specific pair IDs and surfaces (e.g., "front #1 ↔ back #2"). Discuss
+    what the through-knot pattern means structurally — through-knots reduce
+    cross-sectional strength more than surface knots.
+
+  - grade_criteria_applied (3-5 sentences): Explain in plain language which
+    criteria from the grading rubric led to the chosen grade. Reference the
+    specific quantitative thresholds and the actual measured values. e.g.,
+    "Grade A requires no dead knot exceeding 30mm; the largest dead knot found is
+    knot #2 at 38mm on the front face, which exceeds the threshold — therefore
+    Grade B is the highest grade possible. Grade C was not assigned because no
+    knot-holes were detected and dead-knot total area is below the C threshold."
+
+  - structural_assessment (2-3 sentences): Discuss load-bearing implications,
+    moisture/decay risk if any knot type suggests it, and weakest cross-section
+    location (e.g., "the plank's weakest cross-section is at length ~40% where
+    knots cluster on both broad faces").
+
+  - recommendations (2-3 sentences): Specific use-case suggestions matching
+    the grade — e.g., "Suitable for general framing studs and joists but not
+    for visible cabinet faces. Avoid use as a beam under heavy load."
 
 VALIDITY
 Set is_lumber to true only if ALL six images clearly show wooden plank surfaces.
 If any surface is not wood (e.g. a person, food, paper, abstract pattern), set
 is_lumber to false and return empty arrays for every surface, empty pairs,
-zeroed numeric fields, and estimated_grade "Reject".`;
+zeroed numeric fields, estimated_grade "Reject", and put a one-line note in
+detailed_analysis.overall explaining what was wrong.`;
 
 const knotItemSchema: Schema = {
   type: Type.OBJECT,
@@ -133,6 +175,25 @@ const GEMINI6_RESPONSE_SCHEMA: Schema = {
       enum: ["Select", "A", "B", "C", "Reject"],
     },
     reasoning: { type: Type.STRING },
+    detailed_analysis: {
+      type: Type.OBJECT,
+      properties: {
+        overall: { type: Type.STRING },
+        notable_defects: { type: Type.ARRAY, items: { type: Type.STRING } },
+        through_knot_discussion: { type: Type.STRING },
+        grade_criteria_applied: { type: Type.STRING },
+        structural_assessment: { type: Type.STRING },
+        recommendations: { type: Type.STRING },
+      },
+      required: [
+        "overall",
+        "notable_defects",
+        "through_knot_discussion",
+        "grade_criteria_applied",
+        "structural_assessment",
+        "recommendations",
+      ],
+    },
   },
   required: [
     "is_lumber",
@@ -143,6 +204,7 @@ const GEMINI6_RESPONSE_SCHEMA: Schema = {
     "max_knot_diameter_mm",
     "estimated_grade",
     "reasoning",
+    "detailed_analysis",
   ],
 };
 
