@@ -153,7 +153,9 @@ const SHAPES: Record<string, React.ReactNode> = {
 
 // ── Surface tile helper ───────────────────────────────────────────────────────
 
-function SurfaceTile({ label, b64, height }: { label: string; b64?: string; height: number }) {
+function SurfaceTile({ label, b64, height, objectPos = "center" }: {
+  label: string; b64?: string; height: number; objectPos?: string;
+}) {
   return (
     <div className="flex flex-col gap-1">
       <span className="text-[10px] text-neutral-500 uppercase tracking-wider">{label}</span>
@@ -163,7 +165,7 @@ function SurfaceTile({ label, b64, height }: { label: string; b64?: string; heig
           src={`data:image/jpeg;base64,${b64}`}
           alt={label}
           className="w-full border border-neutral-800 bg-neutral-950"
-          style={{ height, objectFit: "cover", objectPosition: "center" }}
+          style={{ height, objectFit: "cover", objectPosition: objectPos }}
         />
       ) : (
         <div
@@ -228,6 +230,15 @@ function DetailPanel({ presetId, onAnalyze, analyzing }: DetailPanelProps) {
   const allLoaded = SURFACE_IDS.every((s) => images[s]);
   const surfaceImages = images as Record<SurfaceId, string>;
 
+  // Build object-position for each surface based on the knot's u coordinate.
+  // This ensures the fixed-height crop always frames the knot rather than
+  // the (often empty) centre of the board.
+  const pos = (sid: SurfaceId): string => {
+    const knot = preset.project.knots.find((k) => k.surface === sid);
+    if (!knot) return "center";
+    return `${Math.round(knot.u * 100)}% center`;
+  };
+
   return (
     <div className="border border-amber-500/30 rounded-2xl bg-neutral-900 overflow-hidden">
       {/* Header */}
@@ -253,20 +264,20 @@ function DetailPanel({ presetId, onAnalyze, analyzing }: DetailPanelProps) {
           <div className="flex flex-col gap-2">
 
             {/* Front — full width, fixed height crop */}
-            <SurfaceTile label="Front" b64={images.front} height={90} />
+            <SurfaceTile label="Front" b64={images.front} height={90} objectPos={pos("front")} />
             {/* Back — full width, fixed height crop */}
-            <SurfaceTile label="Back" b64={images.back} height={90} />
+            <SurfaceTile label="Back" b64={images.back} height={90} objectPos={pos("back")} />
 
             {/* Top + Bottom side by side (thin edges) */}
             <div className="grid grid-cols-2 gap-2">
-              <SurfaceTile label="Top" b64={images.top} height={30} />
-              <SurfaceTile label="Bottom" b64={images.bottom} height={30} />
+              <SurfaceTile label="Top" b64={images.top} height={32} objectPos={pos("top")} />
+              <SurfaceTile label="Bottom" b64={images.bottom} height={32} objectPos={pos("bottom")} />
             </div>
 
             {/* Left + Right side by side (end grain) */}
             <div className="grid grid-cols-2 gap-2">
-              <SurfaceTile label="Left" b64={images.left} height={70} />
-              <SurfaceTile label="Right" b64={images.right} height={70} />
+              <SurfaceTile label="Left" b64={images.left} height={70} objectPos={pos("left")} />
+              <SurfaceTile label="Right" b64={images.right} height={70} objectPos={pos("right")} />
             </div>
           </div>
         )}
