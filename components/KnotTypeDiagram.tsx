@@ -220,13 +220,14 @@ function DetailPanel({ presetId, onAnalyze, analyzing }: DetailPanelProps) {
   const allLoaded = SURFACE_IDS.every((s) => images[s]);
   const surfaceImages = images as Record<SurfaceId, string>;
 
-  // Build object-position for each surface based on the knot's u coordinate.
-  // This ensures the fixed-height crop always frames the knot rather than
-  // the (often empty) centre of the board.
+  // Build object-position for each surface.
+  // When multiple knots share a surface (e.g. compound arris) use their
+  // average u so the crop shows all of them, not just the first one.
   const pos = (sid: SurfaceId): string => {
-    const knot = preset.project.knots.find((k) => k.surface === sid);
-    if (!knot) return "center";
-    return `${Math.round(knot.u * 100)}% center`;
+    const knots = preset.project.knots.filter((k) => k.surface === sid);
+    if (!knots.length) return "center";
+    const avgU = knots.reduce((s, k) => s + k.u, 0) / knots.length;
+    return `${Math.round(avgU * 100)}% center`;
   };
 
   return (

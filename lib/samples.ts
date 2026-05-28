@@ -260,18 +260,18 @@ export const SAMPLE_PRESETS: SamplePreset[] = [
           diameter_mm: 18, aspect_ratio: 1.7, rotation_deg: 0,
           shape: "oval", type: "dead", darkness: 0.88,
         },
-        // Second arris adjacent
+        // Second arris — kept close so both are visible in the cropped tile
         {
           id: "ac-k3",
           surface: "front",
-          u: 0.58, v: 0.97,
+          u: 0.52, v: 0.97,
           diameter_mm: 52, aspect_ratio: 1.9, rotation_deg: -82,
           shape: "spike", type: "dead", darkness: 0.88,
         },
         {
           id: "ac-k4",
           surface: "bottom",
-          u: 0.58, v: 0.52,
+          u: 0.52, v: 0.52,
           diameter_mm: 16, aspect_ratio: 1.5, rotation_deg: 0,
           shape: "oval", type: "dead", darkness: 0.85,
         },
