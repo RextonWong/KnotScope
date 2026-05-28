@@ -18,7 +18,6 @@ For each face, find every visible knot. For each knot:
 - type:
   - "live" — intergrown, intact, often with a darker rim, structurally sound
   - "dead" — loose or encased, dark ring or gap around it, may fall out
-  - "knot_hole" — missing wood, hole present
 - diameter_estimate_mm: integer, best estimate. Assume board face is ~150mm
   wide unless the image clearly suggests otherwise.
 - confidence: 0.0-1.0
@@ -42,10 +41,10 @@ GRADING
 - through_knot_count: length of pairs array
 - max_knot_diameter_mm: largest single knot across both faces
 - estimated_grade:
-  - "Select": fewer than 3 small knots (<20mm), no dead knots, no holes
+  - "Select": fewer than 3 small knots (<20mm), no dead knots
   - "A": no dead knots over 30mm, total knot area under 10% of face area
   - "B": some defects but structurally sound for general construction
-  - "C": large dead knots or holes — decorative or non-structural use only
+  - "C": large dead knots — decorative or non-structural use only
   - "Reject": severe defects, splits, or knot area over 25%
 - reasoning: 1-2 sentences explaining the grade
 
@@ -65,7 +64,7 @@ const knotItemSchema: Schema = {
     },
     type: {
       type: Type.STRING,
-      enum: ["live", "dead", "knot_hole"],
+      enum: ["live", "dead"],
     },
     diameter_estimate_mm: { type: Type.INTEGER },
     confidence: { type: Type.NUMBER },

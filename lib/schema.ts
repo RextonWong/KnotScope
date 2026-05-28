@@ -5,7 +5,7 @@ export const KnotSchema = z.object({
   id: z.number().int(),
   // [ymin, xmin, ymax, xmax] normalized 0-1000 (Gemini native format)
   bbox: z.tuple([z.number(), z.number(), z.number(), z.number()]),
-  type: z.enum(["live", "dead", "knot_hole"]),
+  type: z.enum(["live", "dead"]),
   diameter_estimate_mm: z.number().int(),
   confidence: z.number().min(0).max(1),
 });

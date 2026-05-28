@@ -27,7 +27,7 @@ DETECTION
 For each surface, find every visible knot. For each knot:
   - id: integer starting at 0, unique within that surface
   - bbox: [ymin, xmin, ymax, xmax] normalized to 0-1000 on THAT surface
-  - type: "live" | "dead" | "knot_hole"  (definitions identical to the 2-face flow)
+  - type: "live" | "dead"  (live = intergrown intact knot; dead = loose/encased, dark ring or gap)
   - diameter_estimate_mm: integer, in millimeters using that surface's true dimensions
   - confidence: 0.0–1.0
 
@@ -57,10 +57,10 @@ GRADING
   - through_knot_count: length of pairs array
   - max_knot_diameter_mm: largest single knot across all surfaces
   - estimated_grade:
-      "Select": fewer than 3 small knots (<20mm), no dead, no holes
+      "Select": fewer than 3 small knots (<20mm), no dead knots
       "A": no dead knots over 30mm, total knot area under 10% of total face area
       "B": some defects but structurally sound for general construction
-      "C": large dead knots or holes — decorative / non-structural only
+      "C": large dead knots — decorative / non-structural only
       "Reject": severe defects, splits, or knot area over 25%
   - reasoning: 1 short sentence summary (will be shown as a headline)
 
@@ -120,7 +120,7 @@ const knotItemSchema: Schema = {
       type: Type.ARRAY,
       items: { type: Type.NUMBER },
     },
-    type: { type: Type.STRING, enum: ["live", "dead", "knot_hole"] },
+    type: { type: Type.STRING, enum: ["live", "dead"] },
     diameter_estimate_mm: { type: Type.INTEGER },
     confidence: { type: Type.NUMBER },
   },

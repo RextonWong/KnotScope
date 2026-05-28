@@ -17,7 +17,6 @@ interface SurfaceUnfoldedProps {
 const KNOT_COLORS: Record<Knot["type"], string> = {
   live: "#10b981",
   dead: "#f97316",
-  knot_hole: "#ef4444",
 };
 
 export function SurfaceUnfolded({

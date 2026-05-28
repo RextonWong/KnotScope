@@ -29,7 +29,6 @@ const SHAPE_LABEL: Record<KnotShape, string> = {
 const TYPE_OPTIONS: { value: KnotType; label: string; color: string }[] = [
   { value: "live", label: "Live", color: "border-emerald-500 text-emerald-300" },
   { value: "dead", label: "Dead", color: "border-orange-500 text-orange-300" },
-  { value: "knot_hole", label: "Hole", color: "border-red-500 text-red-300" },
 ];
 
 export function KnotInspector({ knot, onUpdate, onDelete }: KnotInspectorProps) {
@@ -63,7 +62,7 @@ export function KnotInspector({ knot, onUpdate, onDelete }: KnotInspectorProps) 
       {/* Type */}
       <div className="flex flex-col gap-2">
         <label className="text-xs uppercase tracking-wider text-neutral-500">Type</label>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           {TYPE_OPTIONS.map((opt) => {
             const active = knot.type === opt.value;
             return (

@@ -41,7 +41,7 @@ export const KNOT_SHAPES: readonly KnotShape[] = [
   "irregular",
 ] as const;
 
-export type KnotType = "live" | "dead" | "knot_hole";
+export type KnotType = "live" | "dead";
 
 export interface EditableKnot {
   id: string;

@@ -345,14 +345,6 @@ function knotTargetColor(
 ): { core: string; rim: string } {
   // Darkness ∈ [0,1]; map to a multiplicative factor on the surround color
   // for the rim, and a sharper darker core.
-  if (type === "knot_hole") {
-    const coreFac = 0.10 + 0.05 * (1 - darkness);
-    const rimFac = 0.35 + 0.10 * (1 - darkness);
-    return {
-      core: rgbStr([surround[0] * coreFac, surround[1] * coreFac, surround[2] * coreFac]),
-      rim: rgbStr([surround[0] * rimFac, surround[1] * rimFac, surround[2] * rimFac]),
-    };
-  }
   if (type === "dead") {
     const coreFac = 0.35 - 0.20 * darkness;
     const rimFac = 0.22 - 0.10 * darkness;
@@ -456,82 +448,62 @@ function paintKnot(
 
   const path = buildShapePath(knot.shape, cx, cy, rx, ry, knot.rotation_deg, seed);
 
-  // 1. Drop shadow (only for solid knot types — holes get an inverse highlight)
+  // 1. Drop shadow
   ctx.save();
-  if (knot.type === "knot_hole") {
-    // Subtle bright rim around the hole (light catching the lip)
-    ctx.shadowColor = "rgba(255, 240, 200, 0.35)";
-    ctx.shadowBlur = Math.max(2, baseR * 0.25);
-    ctx.shadowOffsetX = -1;
-    ctx.shadowOffsetY = -1;
-  } else {
-    ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
-    ctx.shadowBlur = Math.max(2, baseR * 0.30);
-    ctx.shadowOffsetX = baseR * 0.10;
-    ctx.shadowOffsetY = baseR * 0.15;
-  }
+  ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
+  ctx.shadowBlur = Math.max(2, baseR * 0.30);
+  ctx.shadowOffsetX = baseR * 0.10;
+  ctx.shadowOffsetY = baseR * 0.15;
   ctx.fillStyle = colors.rim;
   path.apply(ctx);
   ctx.fill();
   ctx.restore();
 
-  // 2. Radial gradient fill — direction depends on knot type
+  // 2. Radial gradient fill — center darker than rim (live + dead)
   ctx.save();
-  let grad: CanvasGradient;
-  if (knot.type === "knot_hole") {
-    grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(rx, ry));
-    grad.addColorStop(0, colors.core);
-    grad.addColorStop(0.7, colors.core);
-    grad.addColorStop(1, colors.rim);
-  } else {
-    // Live + dead knots: center is darker than the rim
-    grad = ctx.createRadialGradient(
-      cx - rx * 0.3, cy - ry * 0.3, 0, // off-center to suggest light source
-      cx, cy, Math.max(rx, ry)
-    );
-    grad.addColorStop(0, colors.core);
-    grad.addColorStop(0.55, colors.rim);
-    // Blend slightly back toward surround at the very edge
-    grad.addColorStop(1, rgbStr([
-      surround[0] * 0.70,
-      surround[1] * 0.65,
-      surround[2] * 0.60,
-    ]));
-  }
+  const grad = ctx.createRadialGradient(
+    cx - rx * 0.3, cy - ry * 0.3, 0,
+    cx, cy, Math.max(rx, ry)
+  );
+  grad.addColorStop(0, colors.core);
+  grad.addColorStop(0.55, colors.rim);
+  grad.addColorStop(1, rgbStr([
+    surround[0] * 0.70,
+    surround[1] * 0.65,
+    surround[2] * 0.60,
+  ]));
   ctx.fillStyle = grad;
   path.apply(ctx);
   ctx.fill();
   ctx.restore();
 
-  // 3. Internal grain rings (live/dead knots only)
-  if (knot.type !== "knot_hole") {
-    ctx.save();
-    path.apply(ctx);
-    ctx.clip();
-    ctx.strokeStyle = `rgba(0, 0, 0, ${0.18 + 0.10 * knot.darkness})`;
-    ctx.lineWidth = Math.max(0.7, baseR * 0.04);
-    const rings = 2 + Math.floor(baseR / 6);
-    for (let i = 1; i <= rings; i++) {
-      const f = i / (rings + 1);
-      ctx.beginPath();
-      ctx.ellipse(
-        cx - rx * 0.15 * (1 - f),
-        cy - ry * 0.15 * (1 - f),
-        rx * f,
-        ry * f,
-        (knot.rotation_deg * Math.PI) / 180,
-        0,
-        Math.PI * 2
-      );
-      ctx.stroke();
-    }
-    ctx.restore();
+  // 3. Internal grain rings
+  ctx.save();
+  path.apply(ctx);
+  ctx.clip();
+  ctx.strokeStyle = `rgba(0, 0, 0, ${0.18 + 0.10 * knot.darkness})`;
+  ctx.lineWidth = Math.max(0.7, baseR * 0.04);
+  const rings = 2 + Math.floor(baseR / 6);
+  for (let i = 1; i <= rings; i++) {
+    const f = i / (rings + 1);
+    ctx.beginPath();
+    ctx.ellipse(
+      cx - rx * 0.15 * (1 - f),
+      cy - ry * 0.15 * (1 - f),
+      rx * f,
+      ry * f,
+      (knot.rotation_deg * Math.PI) / 180,
+      0,
+      Math.PI * 2
+    );
+    ctx.stroke();
   }
+  ctx.restore();
 
   // 4. Crisp outline so the knot reads clearly
   ctx.save();
   ctx.lineWidth = Math.max(0.8, baseR * 0.06);
-  ctx.strokeStyle = `rgba(20, 12, 6, ${knot.type === "knot_hole" ? 0.85 : 0.55})`;
+  ctx.strokeStyle = "rgba(20, 12, 6, 0.55)";
   path.apply(ctx);
   ctx.stroke();
   ctx.restore();

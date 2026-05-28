@@ -50,13 +50,11 @@ export function gradeTailwind(grade: Analysis["estimated_grade"]) {
   }
 }
 
-export function knotTypeBadge(type: "live" | "dead" | "knot_hole") {
+export function knotTypeBadge(type: "live" | "dead") {
   switch (type) {
     case "live":
       return { label: "Live", className: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30" };
     case "dead":
       return { label: "Dead", className: "bg-orange-500/20 text-orange-300 border-orange-500/30" };
-    case "knot_hole":
-      return { label: "Hole", className: "bg-red-500/20 text-red-300 border-red-500/30" };
   }
 }

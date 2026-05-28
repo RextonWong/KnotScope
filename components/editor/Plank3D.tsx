@@ -198,7 +198,6 @@ function FacePlane({
 
 function knotColor(k: EditableKnot): string {
   const t = k.darkness;
-  if (k.type === "knot_hole") return "#1a0d05";
   if (k.type === "dead") return t > 0.5 ? "#3a200d" : "#5a3818";
   // live
   return t > 0.5 ? "#6b3a12" : "#8b5a26";
