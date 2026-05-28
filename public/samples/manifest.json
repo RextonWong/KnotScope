@@ -124,19 +124,5 @@
       "left": "/samples/arris-compound-left.jpg",
       "right": "/samples/arris-compound-right.jpg"
     }
-  },
-  {
-    "id": "arris-corner",
-    "label": "Corner Arris Knot",
-    "kind": "6face",
-    "description": "An arris knot at the end corner of the board, spanning the face, the narrow edge, and the end-grain surface. d_max is measured on the face; d_min on the narrower of the two adjacent surfaces.",
-    "surfaces": {
-      "front": "/samples/arris-corner-front.jpg",
-      "back": "/samples/arris-corner-back.jpg",
-      "top": "/samples/arris-corner-top.jpg",
-      "bottom": "/samples/arris-corner-bottom.jpg",
-      "left": "/samples/arris-corner-left.jpg",
-      "right": "/samples/arris-corner-right.jpg"
-    }
   }
 ]

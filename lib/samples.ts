@@ -279,44 +279,6 @@ export const SAMPLE_PRESETS: SamplePreset[] = [
     },
   },
 
-  {
-    id: "arris-corner",
-    label: "Corner Arris Knot",
-    shortLabel: "Corner Arris",
-    description:
-      "An arris knot at the end corner of the board, spanning the face, the narrow " +
-      "edge, and the end-grain surface. d_max is measured on the face; d_min on the " +
-      "narrower of the two adjacent surfaces.",
-    project: {
-      dimensions: { length_mm: 2400, width_mm: 150, thickness_mm: 25 },
-      knots: [
-        // Front face, top-right area
-        {
-          id: "ck-k1",
-          surface: "front",
-          u: 0.78, v: 0.04,
-          diameter_mm: 65, aspect_ratio: 2.6, rotation_deg: 84,
-          shape: "spike", type: "dead", darkness: 0.90,
-        },
-        // Top edge
-        {
-          id: "ck-k2",
-          surface: "top",
-          u: 0.78, v: 0.52,
-          diameter_mm: 18, aspect_ratio: 1.9, rotation_deg: 0,
-          shape: "oval", type: "dead", darkness: 0.88,
-        },
-        // Right end-grain
-        {
-          id: "ck-k3",
-          surface: "right",
-          u: 0.28, v: 0.44,
-          diameter_mm: 16, aspect_ratio: 1.4, rotation_deg: 0,
-          shape: "oval", type: "dead", darkness: 0.85,
-        },
-      ],
-    },
-  },
 ];
 
 // ── Row groupings for the interactive diagram ────────────────────────────────
@@ -340,6 +302,6 @@ export const DIAGRAM_ROWS: DiagramRow[] = [
   {
     label: "Arris & Edge Knots",
     subtitle: "Knots crossing the long or corner edge — visible on two or more surfaces.",
-    caseIds: ["arris-single", "arris-compound", "arris-corner"],
+    caseIds: ["arris-single", "arris-compound"],
   },
 ];

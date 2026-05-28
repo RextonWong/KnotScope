@@ -139,16 +139,6 @@ const SHAPES: Record<string, React.ReactNode> = {
     </Board>
   ),
 
-  "arris-corner": (
-    // Corner arris: large triangle at top-right corner spanning face + end
-    <Board>
-      <polygon points="222,7 300,7 300,45"
-        fill={KNOT} stroke={KNOT_D} strokeWidth="1" />
-      {/* Shows on top edge strip */}
-      <polygon points="228,0 300,0 300,7 222,7"
-        fill={KNOT} stroke={KNOT_D} strokeWidth="0.8" opacity={0.85} />
-    </Board>
-  ),
 };
 
 // ── Surface tile helper ───────────────────────────────────────────────────────
