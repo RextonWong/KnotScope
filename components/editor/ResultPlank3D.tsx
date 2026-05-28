@@ -196,6 +196,7 @@ export function ResultPlank3D({ analysis, dimensions, surfaceImages, selectedKno
   }, [analysis, faces, dimensions]);
 
   const knotColorFor = (k: Knot) => {
+    if (k.type === "knot_hole") return "#ef4444";
     if (k.type === "dead") return "#f97316";
     return "#10b981";
   };

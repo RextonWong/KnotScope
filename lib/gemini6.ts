@@ -11,15 +11,13 @@ plank: the six surfaces in 3D space. The plank has these physical dimensions:
   - width:     ${dims.width_mm} mm
   - thickness: ${dims.thickness_mm} mm
 
-Surfaces:
-  - front  (length × width) — primary broad face, top of the board as it lies flat
-  - back   (length × width) — opposite broad face; mirror of front across the
-                              thickness axis. A knot at u=X on the front pairs
-                              with a knot at u=(1000 - X) on the back, same v.
+Surfaces (u is the long axis of each surface, v is the short axis):
+  - front  (length × width)    — primary broad face, top of the board as it lies flat
+  - back   (length × width)    — opposite broad face; mirror of front along u (board flipped about its long axis)
   - top    (length × thickness) — long thin edge along one long side
-  - bottom (length × thickness) — opposite long edge; mirror of top across width
+  - bottom (length × thickness) — opposite long edge; mirror of top along v (board flipped about its long axis)
   - left   (width × thickness) — short end-grain face on one end
-  - right  (width × thickness) — opposite short end-grain face; mirror of left across length
+  - right  (width × thickness) — opposite end-grain face; mirror of left along u (board flipped about its width axis)
 
 Return STRICT JSON matching the provided schema. No prose, no markdown.
 
@@ -27,7 +25,10 @@ DETECTION
 For each surface, find every visible knot. For each knot:
   - id: integer starting at 0, unique within that surface
   - bbox: [ymin, xmin, ymax, xmax] normalized to 0-1000 on THAT surface
-  - type: "live" | "dead"  (live = intergrown intact knot; dead = loose/encased, dark ring or gap)
+  - type: "live" | "dead" | "knot_hole"
+      live      — intergrown, intact, often with a darker rim, structurally sound
+      dead      — loose or encased, dark ring or gap around it, may fall out
+      knot_hole — missing wood, visible cavity / hole through the surface
   - diameter_estimate_mm: integer, in millimeters using that surface's true dimensions
   - confidence: 0.0–1.0
 
@@ -39,12 +40,19 @@ face directly opposite. Pairs are ONLY valid between opposite faces:
   - left ↔ right
 Diagonal pairs (e.g. front↔top) are NEVER valid — report them as separate knots.
 
-To pair two opposite-face knots:
-  1. Mirror one knot's u coordinate: u' = 1000 - u. Match knots whose mirrored
-     u is within ~120 units and whose v is within ~120 units.
-  2. Diameters should match within ~35%.
-  3. Type may differ across faces (a live knot on one side often becomes a
-     dead knot or hole on the other).
+Mirror rules differ per pair because of how the board is rotated when
+photographing the opposite face:
+  - front ↔ back   : board flipped around the LONG axis → u flips, v is preserved.
+                     Pair when |u_a + u_b - 1000| ≲ 120 and |v_a - v_b| ≲ 120.
+  - top   ↔ bottom : board flipped around the LONG axis → u is preserved, v flips.
+                     Pair when |u_a - u_b| ≲ 120 and |v_a + v_b - 1000| ≲ 120.
+  - left  ↔ right  : board flipped around the WIDTH axis → u flips, v is preserved.
+                     Pair when |u_a + u_b - 1000| ≲ 120 and |v_a - v_b| ≲ 120.
+
+In addition:
+  - Diameters should match within ~35%.
+  - Type may differ across faces (a live knot on one side often becomes a
+    dead knot or hole on the other).
 Return pairs as an array of:
   { "a": {"surface": "<front|back|top|bottom|left|right>", "id": <int>},
     "b": {"surface": "<opposite>", "id": <int>},
@@ -57,10 +65,10 @@ GRADING
   - through_knot_count: length of pairs array
   - max_knot_diameter_mm: largest single knot across all surfaces
   - estimated_grade:
-      "Select": fewer than 3 small knots (<20mm), no dead knots
+      "Select": fewer than 3 small knots (<20mm), no dead, no holes
       "A": no dead knots over 30mm, total knot area under 10% of total face area
       "B": some defects but structurally sound for general construction
-      "C": large dead knots — decorative / non-structural only
+      "C": large dead knots or holes — decorative / non-structural only
       "Reject": severe defects, splits, or knot area over 25%
   - reasoning: 1 short sentence summary (will be shown as a headline)
 
@@ -120,7 +128,7 @@ const knotItemSchema: Schema = {
       type: Type.ARRAY,
       items: { type: Type.NUMBER },
     },
-    type: { type: Type.STRING, enum: ["live", "dead"] },
+    type: { type: Type.STRING, enum: ["live", "dead", "knot_hole"] },
     diameter_estimate_mm: { type: Type.INTEGER },
     confidence: { type: Type.NUMBER },
   },

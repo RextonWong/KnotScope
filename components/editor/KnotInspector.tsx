@@ -1,8 +1,8 @@
 "use client";
 
-import type { EditableKnot, KnotShape, KnotType } from "@/lib/plank";
-import { KNOT_SHAPES } from "@/lib/plank";
-import { Trash2, Circle, Egg, Slash, Zap, Sparkles } from "lucide-react";
+import type { EditableKnot, KnotShape, KnotType, TunnelSpec } from "@/lib/plank";
+import { KNOT_SHAPES, makeDefaultTunnel, oppositeSurface } from "@/lib/plank";
+import { Trash2, Circle, Egg, Slash, Zap, Sparkles, Cylinder } from "lucide-react";
 
 interface KnotInspectorProps {
   knot: EditableKnot | null;
@@ -154,6 +154,9 @@ export function KnotInspector({ knot, onUpdate, onDelete }: KnotInspectorProps) 
         onChange={(v) => onUpdate({ darkness: v })}
       />
 
+      {/* Tunnel — promotes a surface knot into a 3D tunnel through the plank */}
+      <TunnelSection knot={knot} onUpdate={onUpdate} />
+
       <button
         type="button"
         onClick={onDelete}
@@ -163,6 +166,136 @@ export function KnotInspector({ knot, onUpdate, onDelete }: KnotInspectorProps) 
         Delete knot
       </button>
     </aside>
+  );
+}
+
+interface TunnelSectionProps {
+  knot: EditableKnot;
+  onUpdate: (patch: Partial<EditableKnot>) => void;
+}
+
+function TunnelSection({ knot, onUpdate }: TunnelSectionProps) {
+  const tunnel = knot.tunnel;
+  const isOn = tunnel != null;
+
+  const patchTunnel = (p: Partial<TunnelSpec>) => {
+    if (!tunnel) return;
+    onUpdate({ tunnel: { ...tunnel, ...p } });
+  };
+
+  return (
+    <div className="flex flex-col gap-3 pt-4 border-t border-neutral-800">
+      <div className="flex items-center justify-between">
+        <label className="text-xs uppercase tracking-wider text-neutral-500 flex items-center gap-1.5">
+          <Cylinder size={12} className="text-amber-500" />
+          Tunnel
+        </label>
+        <button
+          type="button"
+          onClick={() => {
+            if (isOn) onUpdate({ tunnel: undefined });
+            else onUpdate({ tunnel: makeDefaultTunnel(knot) });
+          }}
+          className={`text-xs px-2.5 py-1 rounded border font-medium transition-colors ${
+            isOn
+              ? "border-amber-500 text-amber-300 bg-amber-500/10"
+              : "border-neutral-800 text-neutral-500 hover:border-neutral-700 hover:text-neutral-300"
+          }`}
+        >
+          {isOn ? "On" : "Off"}
+        </button>
+      </div>
+
+      {!isOn && (
+        <p className="text-[10px] text-neutral-600 leading-relaxed">
+          Turn on to make this knot pass through the plank in 3D. The exit
+          appears on the opposite face (or ends inside the wood, if blind).
+        </p>
+      )}
+
+      {tunnel && (
+        <>
+          {/* Mode */}
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => patchTunnel({ exit_kind: "through" })}
+              className={`text-xs py-1.5 rounded border font-medium transition-colors ${
+                tunnel.exit_kind === "through"
+                  ? "border-amber-500 text-amber-300 bg-amber-500/10"
+                  : "border-neutral-800 text-neutral-500 hover:border-neutral-700"
+              }`}
+            >
+              Through
+            </button>
+            <button
+              type="button"
+              onClick={() => patchTunnel({ exit_kind: "blind" })}
+              className={`text-xs py-1.5 rounded border font-medium transition-colors ${
+                tunnel.exit_kind === "blind"
+                  ? "border-amber-500 text-amber-300 bg-amber-500/10"
+                  : "border-neutral-800 text-neutral-500 hover:border-neutral-700"
+              }`}
+            >
+              Blind
+            </button>
+          </div>
+
+          {tunnel.exit_kind === "through" && (
+            <p className="text-[10px] text-neutral-600">
+              Exits on:{" "}
+              <span className="text-amber-400 font-mono uppercase">
+                {oppositeSurface(knot.surface)}
+              </span>
+            </p>
+          )}
+          {tunnel.exit_kind === "blind" && (
+            <p className="text-[10px] text-neutral-600">
+              Tip ends inside the wood. Depth controls how far in.
+            </p>
+          )}
+
+          <SliderRow
+            label={tunnel.exit_kind === "blind" ? "Tip drift u" : "Exit offset u"}
+            value={Number(tunnel.exit_du.toFixed(2))}
+            unit=""
+            min={-0.4}
+            max={0.4}
+            step={0.02}
+            onChange={(v) => patchTunnel({ exit_du: v })}
+          />
+          <SliderRow
+            label={tunnel.exit_kind === "blind" ? "Tip drift v" : "Exit offset v"}
+            value={Number(tunnel.exit_dv.toFixed(2))}
+            unit=""
+            min={-0.4}
+            max={0.4}
+            step={0.02}
+            onChange={(v) => patchTunnel({ exit_dv: v })}
+          />
+          <SliderRow
+            label={tunnel.exit_kind === "blind" ? "Tip diameter" : "Exit diameter"}
+            value={tunnel.exit_diameter_mm}
+            unit="mm"
+            min={3}
+            max={80}
+            step={1}
+            onChange={(v) => patchTunnel({ exit_diameter_mm: v })}
+          />
+          {tunnel.exit_kind === "blind" && (
+            <SliderRow
+              label="Depth"
+              value={Number(tunnel.depth_factor.toFixed(2))}
+              unit=""
+              min={0.1}
+              max={0.95}
+              step={0.05}
+              onChange={(v) => patchTunnel({ depth_factor: v })}
+            />
+          )}
+        </>
+      )}
+    </div>
   );
 }
 

@@ -5,7 +5,7 @@ import type {
   PlankDimensions,
   SurfaceId,
 } from "./plank";
-import { getSurfaceSize } from "./plank";
+import { getSurfaceSize, oppositeSurface, tunnelExitOnOpposite } from "./plank";
 
 // ── Deterministic hashing for stable randomness across renders ──────────────
 
@@ -538,10 +538,32 @@ export async function renderSurface(
 
   paintWood(ctx, surface, wPx, hPx);
 
-  // Paint only the knots that belong to this surface
+  // Paint the knots that belong to this surface (entry knots).
   const mine = knots.filter((k) => k.surface === surface);
   for (const k of mine) {
     paintKnot(ctx, k, surface, dims, wPx, hPx);
+  }
+
+  // Paint the exit ends of through-tunnels whose opposite face is this surface.
+  // Blind tunnels never produce a visible exit on any surface.
+  const exits = knots.filter(
+    (k) => k.tunnel?.exit_kind === "through" && oppositeSurface(k.surface) === surface
+  );
+  for (const k of exits) {
+    const pos = tunnelExitOnOpposite(k);
+    if (!pos) continue;
+    const derived: EditableKnot = {
+      ...k,
+      surface,
+      u: pos.u,
+      v: pos.v,
+      diameter_mm: k.tunnel!.exit_diameter_mm,
+      // Distinct id so shape-irregular randomness differs from the entry end.
+      id: `${k.id}__exit`,
+      // Exits don't recursively spawn exits.
+      tunnel: undefined,
+    };
+    paintKnot(ctx, derived, surface, dims, wPx, hPx);
   }
 
   const dataUrl = canvas.toDataURL("image/jpeg", opts.jpegQuality ?? 0.88);

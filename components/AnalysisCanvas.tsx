@@ -7,6 +7,7 @@ import { bboxToPixels } from "@/lib/bbox";
 const TYPE_COLORS: Record<Knot["type"], string> = {
   live: "#10b981",
   dead: "#f97316",
+  knot_hole: "#ef4444",
 };
 
 interface AnalysisCanvasProps {

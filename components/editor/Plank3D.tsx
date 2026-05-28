@@ -2,14 +2,19 @@
 
 import { Canvas, useThree, type ThreeEvent } from "@react-three/fiber";
 import { OrbitControls, Html } from "@react-three/drei";
-import { Suspense, useMemo, useRef, useEffect } from "react";
+import { Fragment, Suspense, useMemo, useRef, useEffect } from "react";
 import * as THREE from "three";
 import type {
   EditableKnot,
   PlankDimensions,
   SurfaceId,
 } from "@/lib/plank";
-import { getSurfaceSize } from "@/lib/plank";
+import {
+  getSurfaceSize,
+  oppositeSurface,
+  throughAxisMm,
+  tunnelExitOnOpposite,
+} from "@/lib/plank";
 
 const MM_TO_WORLD = 0.01;
 
@@ -203,6 +208,162 @@ function knotColor(k: EditableKnot): string {
   return t > 0.5 ? "#6b3a12" : "#8b5a26";
 }
 
+// ── Tunnel rendering ─────────────────────────────────────────────────────────
+
+function surfaceWorldFromUv(face: FaceConfig, u: number, v: number): THREE.Vector3 {
+  const { lx, ly } = face.localFromUv(u, v);
+  const v3 = new THREE.Vector3(lx, ly, 0);
+  v3.applyEuler(new THREE.Euler(face.rotation[0], face.rotation[1], face.rotation[2]));
+  v3.add(new THREE.Vector3(face.position[0], face.position[1], face.position[2]));
+  return v3;
+}
+
+function faceInwardNormal(face: FaceConfig): THREE.Vector3 {
+  const n = new THREE.Vector3(0, 0, 1);
+  n.applyEuler(new THREE.Euler(face.rotation[0], face.rotation[1], face.rotation[2]));
+  return n.negate();
+}
+
+interface TunnelInfo {
+  knot: EditableKnot;
+  fromWorld: THREE.Vector3;
+  toWorld: THREE.Vector3;
+  fromRadius: number;
+  toRadius: number;
+  exitFace: FaceConfig | null;
+  exitUv: { u: number; v: number } | null;
+}
+
+function buildTunnelInfos(
+  knots: EditableKnot[],
+  faces: FaceConfig[],
+  dims: PlankDimensions
+): TunnelInfo[] {
+  const out: TunnelInfo[] = [];
+  for (const k of knots) {
+    if (!k.tunnel) continue;
+    const face = faces.find((f) => f.id === k.surface);
+    if (!face) continue;
+    const fromWorld = surfaceWorldFromUv(face, k.u, k.v);
+    const fromRadius = Math.max(0.015, (k.diameter_mm / 2) * MM_TO_WORLD);
+    const toRadius = Math.max(0.015, (k.tunnel.exit_diameter_mm / 2) * MM_TO_WORLD);
+
+    if (k.tunnel.exit_kind === "through") {
+      const exit = tunnelExitOnOpposite(k);
+      if (!exit) continue;
+      const exitFace = faces.find((f) => f.id === oppositeSurface(k.surface));
+      if (!exitFace) continue;
+      out.push({
+        knot: k,
+        fromWorld,
+        toWorld: surfaceWorldFromUv(exitFace, exit.u, exit.v),
+        fromRadius,
+        toRadius,
+        exitFace,
+        exitUv: exit,
+      });
+    } else {
+      const driftedEntry = surfaceWorldFromUv(
+        face,
+        Math.max(0, Math.min(1, k.u + k.tunnel.exit_du)),
+        Math.max(0, Math.min(1, k.v + k.tunnel.exit_dv))
+      );
+      const inward = faceInwardNormal(face);
+      const throughLen = throughAxisMm(k.surface, dims) * MM_TO_WORLD;
+      const tipWorld = driftedEntry.add(
+        inward.multiplyScalar(throughLen * k.tunnel.depth_factor)
+      );
+      out.push({
+        knot: k,
+        fromWorld,
+        toWorld: tipWorld,
+        fromRadius,
+        toRadius,
+        exitFace: null,
+        exitUv: null,
+      });
+    }
+  }
+  return out;
+}
+
+interface TunnelCylinderProps {
+  info: TunnelInfo;
+  selected: boolean;
+}
+
+function TunnelCylinder({ info, selected }: TunnelCylinderProps) {
+  const { fromWorld, toWorld, fromRadius, toRadius, knot } = info;
+  const length = fromWorld.distanceTo(toWorld);
+  if (length < 1e-4) return null;
+  const mid = fromWorld.clone().add(toWorld).multiplyScalar(0.5);
+  const dir = toWorld.clone().sub(fromWorld).normalize();
+  const quat = new THREE.Quaternion().setFromUnitVectors(
+    new THREE.Vector3(0, 1, 0),
+    dir
+  );
+  // cylinderGeometry top end (+Y/2) is now in `dir` direction → top = exit/tip,
+  // bottom = entry. So radiusTop = toRadius, radiusBottom = fromRadius.
+  const color = selected ? "#f59e0b" : knotColor(knot);
+  return (
+    <mesh
+      position={[mid.x, mid.y, mid.z]}
+      quaternion={quat}
+      renderOrder={2}
+    >
+      <cylinderGeometry args={[toRadius, fromRadius, length, 24, 1, false]} />
+      <meshBasicMaterial
+        color={color}
+        transparent
+        opacity={selected ? 0.85 : 0.6}
+        depthTest={false}
+        depthWrite={false}
+      />
+    </mesh>
+  );
+}
+
+interface TunnelExitMarkerProps {
+  info: TunnelInfo;
+  selected: boolean;
+  onSelect: () => void;
+}
+
+function TunnelExitMarker({ info, selected, onSelect }: TunnelExitMarkerProps) {
+  if (!info.exitFace || !info.exitUv) return null;
+  const face = info.exitFace;
+  const { lx, ly } = face.localFromUv(info.exitUv.u, info.exitUv.v);
+  const r = info.toRadius;
+  const ar = Math.max(0.3, Math.min(3, info.knot.aspect_ratio || 1));
+  const rx = r * (ar >= 1 ? ar : 1);
+  const ry = r * (ar >= 1 ? 1 : 1 / ar);
+  return (
+    <group position={face.position} rotation={face.rotation}>
+      <group
+        position={[lx, ly, 0.004]}
+        rotation={[0, 0, (info.knot.rotation_deg * Math.PI) / 180]}
+      >
+        <mesh
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelect();
+          }}
+          scale={[rx, ry, 1]}
+        >
+          <circleGeometry args={[1, 32]} />
+          <meshBasicMaterial color={knotColor(info.knot)} />
+        </mesh>
+        {selected && (
+          <mesh scale={[rx * 1.25, ry * 1.25, 1]} position={[0, 0, 0.001]}>
+            <ringGeometry args={[0.85, 1, 48]} />
+            <meshBasicMaterial color="#f59e0b" />
+          </mesh>
+        )}
+      </group>
+    </group>
+  );
+}
+
 interface KnotMarkerProps {
   x: number;
   y: number;
@@ -275,6 +436,10 @@ function FitCamera({ dimensions }: { dimensions: PlankDimensions }) {
 
 export function Plank3D(props: Plank3DProps) {
   const faces = useMemo(() => buildFaces(props.dimensions), [props.dimensions]);
+  const tunnels = useMemo(
+    () => buildTunnelInfos(props.knots, faces, props.dimensions),
+    [props.knots, faces, props.dimensions]
+  );
   const L = props.dimensions.length_mm * MM_TO_WORLD;
   const W = props.dimensions.width_mm * MM_TO_WORLD;
   const T = props.dimensions.thickness_mm * MM_TO_WORLD;
@@ -316,6 +481,21 @@ export function Plank3D(props: Plank3DProps) {
               onSelectSurface={props.onSelectSurface}
             />
           ))}
+
+          {/* Tunnel cylinders + their opposite-face exit discs */}
+          {tunnels.map((info) => {
+            const selected = info.knot.id === props.selectedKnotId;
+            return (
+              <Fragment key={info.knot.id}>
+                <TunnelCylinder info={info} selected={selected} />
+                <TunnelExitMarker
+                  info={info}
+                  selected={selected}
+                  onSelect={() => props.onSelectKnot(info.knot.id)}
+                />
+              </Fragment>
+            );
+          })}
 
           <FitCamera dimensions={props.dimensions} />
         </Suspense>
