@@ -3,7 +3,9 @@ import { Analysis6Schema } from "./schema";
 import type { PlankDimensions } from "./plank";
 import type { RenderedSurface } from "./renderSurface";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+const apiKey = process.env.GEMINI_API_KEY;
+if (!apiKey) throw new Error("GEMINI_API_KEY environment variable is not set");
+const ai = new GoogleGenAI({ apiKey });
 
 const PROMPT_TEMPLATE = (dims: PlankDimensions) => `You are an expert lumber grader analyzing six photographs of the SAME wooden
 plank: the six surfaces in 3D space. The plank has these physical dimensions:

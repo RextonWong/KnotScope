@@ -5,8 +5,19 @@ import type { DocumentProps } from "@react-pdf/renderer";
 import type { ReactElement } from "react";
 import { AnalysisSchema } from "@/lib/schema";
 import { ReportDocument } from "@/lib/pdf";
+import { checkRateLimit, clientIp } from "@/lib/rateLimit";
+
+const MAX_IMAGE_B64_BYTES = 5 * 1024 * 1024;
 
 export async function POST(req: NextRequest) {
+  const rl = checkRateLimit(`report:${clientIp(req)}`, 10);
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: "Too many requests. Please wait before generating another report." },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfterSec ?? 60) } }
+    );
+  }
+
   let body: unknown;
   try {
     body = await req.json();
@@ -22,6 +33,10 @@ export async function POST(req: NextRequest) {
 
   if (typeof frontImage !== "string" || typeof backImage !== "string") {
     return NextResponse.json({ error: "frontImage and backImage are required strings" }, { status: 400 });
+  }
+
+  if (frontImage.length > MAX_IMAGE_B64_BYTES || backImage.length > MAX_IMAGE_B64_BYTES) {
+    return NextResponse.json({ error: "Image exceeds the 5 MB limit" }, { status: 413 });
   }
 
   let analysis;

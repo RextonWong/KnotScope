@@ -1,7 +1,9 @@
 import { GoogleGenAI, Type, type Schema } from "@google/genai";
 import { AnalysisSchema } from "./schema";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+const apiKey = process.env.GEMINI_API_KEY;
+if (!apiKey) throw new Error("GEMINI_API_KEY environment variable is not set");
+const ai = new GoogleGenAI({ apiKey });
 
 const PROMPT = `You are an expert lumber grader analyzing two photographs of the SAME wooden
 board: the front face and the back face. The board has been flipped over
