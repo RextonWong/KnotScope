@@ -45,6 +45,9 @@ export const Pair6Schema = z.object({
   a: PairRefSchema,
   b: PairRefSchema,
   confidence: z.number().min(0).max(1),
+  // "through" = branch passes fully through opposite faces (front↔back etc.)
+  // "arris"   = branch exits through a long edge or end corner (front↔top etc.)
+  kind: z.enum(["through", "arris"]).optional().default("through"),
 });
 
 export const DetailedAnalysisSchema = z.object({

@@ -79,7 +79,8 @@ export function SurfaceGallery({
 
   // Compute pair lines in container coordinates if we have an analysis
   let pairLines: {
-    x1: number; y1: number; x2: number; y2: number; selected: boolean;
+    x1: number; y1: number; x2: number; y2: number;
+    selected: boolean; kind: "through" | "arris";
   }[] = [];
   if (analysis) {
     const container = containerRef.current;
@@ -105,6 +106,7 @@ export function SurfaceGallery({
           x2: rB.left - cr.left + cB.x,
           y2: rB.top - cr.top + cB.y,
           selected: sel,
+          kind: (p.kind ?? "through") as "through" | "arris",
         }];
       });
     }
@@ -129,10 +131,10 @@ export function SurfaceGallery({
             <path
               key={i}
               d={`M ${l.x1} ${l.y1} Q ${cx} ${cy} ${l.x2} ${l.y2}`}
-              stroke={l.selected ? "#f59e0b" : "#d97706"}
+              stroke={l.selected ? "#f59e0b" : l.kind === "arris" ? "#60a5fa" : "#d97706"}
               strokeWidth={l.selected ? 2.5 : 1.5}
               fill="none"
-              strokeDasharray="6 4"
+              strokeDasharray={l.kind === "arris" ? "4 3" : "6 4"}
               opacity={l.selected ? 1 : 0.55}
               strokeLinecap="round"
             />

@@ -125,23 +125,20 @@ function KnotMarker3D({
 }
 
 function PairLine3D({
-  a,
-  b,
-  selected,
+  a, b, selected, kind = "through",
 }: {
-  a: THREE.Vector3;
-  b: THREE.Vector3;
-  selected: boolean;
+  a: THREE.Vector3; b: THREE.Vector3;
+  selected: boolean; kind?: "through" | "arris";
 }) {
   const geometry = useMemo(() => {
-    const points = [a, b];
-    return new THREE.BufferGeometry().setFromPoints(points);
+    return new THREE.BufferGeometry().setFromPoints([a, b]);
   }, [a, b]);
+  const baseColor = kind === "arris" ? "#60a5fa" : "#d97706";
   return (
     <line>
       <primitive attach="geometry" object={geometry} />
       <lineBasicMaterial
-        color={selected ? "#f59e0b" : "#d97706"}
+        color={selected ? "#f59e0b" : baseColor}
         linewidth={1}
         transparent
         opacity={selected ? 1 : 0.7}
@@ -244,7 +241,7 @@ export function ResultPlank3D({ analysis, dimensions, surfaceImages, selectedKno
             const sel =
               (selectedKnot?.surface === p.a.surface && selectedKnot.id === p.a.id) ||
               (selectedKnot?.surface === p.b.surface && selectedKnot.id === p.b.id);
-            return <PairLine3D key={i} a={a} b={b} selected={sel} />;
+            return <PairLine3D key={i} a={a} b={b} selected={sel} kind={p.kind ?? "through"} />;
           })}
 
           <FitCamera dimensions={dimensions} />

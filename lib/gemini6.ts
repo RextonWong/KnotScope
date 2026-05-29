@@ -32,37 +32,56 @@ For each surface, find every visible knot. For each knot:
   - diameter_estimate_mm: integer, in millimeters using that surface's true dimensions
   - confidence: 0.0–1.0
 
-PAIRING (through-knots — the critical step)
-A through-knot is one branch passing through the plank from one face to the
-face directly opposite. Pairs are ONLY valid between opposite faces:
-  - front ↔ back
-  - top ↔ bottom
-  - left ↔ right
-Diagonal pairs (e.g. front↔top) are NEVER valid — report them as separate knots.
+PAIRING — two valid kinds, always conservative
+Two kinds of branch pairs are detectable. Both use the same pair schema;
+set the "kind" field accordingly.
 
-Mirror rules differ per pair because of how the board is rotated when
-photographing the opposite face:
-  - front ↔ back   : board flipped around the LONG axis → u flips, v is preserved.
-                     Pair when |u_a + u_b - 1000| ≲ 120 and |v_a - v_b| ≲ 120.
-  - top   ↔ bottom : board flipped around the LONG axis → u is preserved, v flips.
-                     Pair when |u_a - u_b| ≲ 120 and |v_a + v_b - 1000| ≲ 120.
-  - left  ↔ right  : board flipped around the WIDTH axis → u flips, v is preserved.
-                     Pair when |u_a + u_b - 1000| ≲ 120 and |v_a - v_b| ≲ 120.
+────────────────────────────────────────────────────
+KIND "through" — branch passes fully through the plank
+────────────────────────────────────────────────────
+Valid ONLY between OPPOSITE faces:
+  front ↔ back  |  top ↔ bottom  |  left ↔ right
 
-In addition:
-  - Diameters should match within ~35%.
-  - Type may differ across faces (a live knot on one side often becomes a
-    dead knot or hole on the other).
-Return pairs as an array of:
-  { "a": {"surface": "<front|back|top|bottom|left|right>", "id": <int>},
-    "b": {"surface": "<opposite>", "id": <int>},
-    "confidence": 0..1 }
-Unmatched knots do NOT appear in pairs. Conservative pairing is preferred —
-a wrong pair is worse than a missed pair.
+Mirror rules (u/v in 0-1000 space):
+  front ↔ back   : u flips (|u_a + u_b − 1000| ≲ 120), v preserved (|v_a − v_b| ≲ 120)
+  top   ↔ bottom : u preserved (|u_a − u_b| ≲ 120), v flips (|v_a + v_b − 1000| ≲ 120)
+  left  ↔ right  : u flips (|u_a + u_b − 1000| ≲ 120), v preserved (|v_a − v_b| ≲ 120)
+Diameters within ~35%. Type may differ.
+
+────────────────────────────────────────────────────
+KIND "arris" — branch exits through a long edge or end corner
+────────────────────────────────────────────────────
+An arris knot is visible on TWO ADJACENT surfaces that share a physical edge of
+the board. On BOTH surfaces the knot must sit AT that shared edge — within 200
+units of the relevant boundary (v=0, v=1000, u=0, or u=1000).
+
+Valid adjacent pairs and edge-proximity rules:
+
+Long arris (broad face ↔ narrow long edge):
+  front ↔ top    : front.v < 200 (top edge)    AND top.v   > 800 (front side) AND |Δu| < 150
+  front ↔ bottom : front.v > 800 (bottom edge) AND bottom.v < 200 (front side) AND |Δu| < 150
+  back  ↔ top    : back.v  < 200 (top edge)    AND top.v   < 200 (back side)  AND |u_back + u_top − 1000| < 150
+  back  ↔ bottom : back.v  > 800 (bottom edge) AND bottom.v > 800 (back side)  AND |u_back + u_bottom − 1000| < 150
+
+Short-end arris (any face ↔ end-grain face):
+  front ↔ left  : front.u < 200  AND left.v  < 200  (left end, front side)
+  front ↔ right : front.u > 800  AND right.v < 200  (right end, front side)
+  back  ↔ left  : back.u  > 800  AND left.v  < 200  (back u is flipped)
+  back  ↔ right : back.u  < 200  AND right.v < 200
+  top   ↔ left  : top.u   < 200  AND left.u  < 200  (top-left corner)
+  top   ↔ right : top.u   > 800  AND right.u > 800  (top-right corner)
+  bottom↔ left  : bottom.u < 200 AND left.u  < 200  (bottom-left corner)
+  bottom↔ right : bottom.u > 800 AND right.u > 800  (bottom-right corner)
+
+For arris pairs the knot size on the narrower surface is typically smaller;
+diameters need only match within ~50%.
+
+Unmatched knots do NOT appear in pairs.
+Conservative pairing is always preferred — a wrong pair is worse than a missed one.
 
 GRADING
   - total_knots: count across all 6 surfaces
-  - through_knot_count: length of pairs array
+  - through_knot_count: total number of pairs (both "through" and "arris" kinds)
   - max_knot_diameter_mm: largest single knot across all surfaces
   - estimated_grade:
       "Select": fewer than 3 small knots (<20mm), no dead, no holes
@@ -171,8 +190,9 @@ const GEMINI6_RESPONSE_SCHEMA: Schema = {
           a: pairRefSchema,
           b: pairRefSchema,
           confidence: { type: Type.NUMBER },
+          kind: { type: Type.STRING, enum: ["through", "arris"] },
         },
-        required: ["a", "b", "confidence"],
+        required: ["a", "b", "confidence", "kind"],
       },
     },
     total_knots: { type: Type.INTEGER },
