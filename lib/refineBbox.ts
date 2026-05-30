@@ -22,23 +22,34 @@ interface Lum {
 
 function loadLuminance(base64: string): Promise<Lum | null> {
   return new Promise((resolve) => {
+    if (!base64) { resolve(null); return; }
+    let settled = false;
+    const done = (val: Lum | null) => { if (!settled) { settled = true; resolve(val); } };
+    // Hard timeout: never let a stuck image decode block the analysis flow.
+    const timer = setTimeout(() => done(null), 3000);
+
     const img = new Image();
     img.onload = () => {
-      const w = img.naturalWidth, h = img.naturalHeight;
-      if (w < 3 || h < 3) { resolve(null); return; }
-      const cv = document.createElement("canvas");
-      cv.width = w; cv.height = h;
-      const ctx = cv.getContext("2d", { willReadFrequently: true });
-      if (!ctx) { resolve(null); return; }
-      ctx.drawImage(img, 0, 0);
-      const px = ctx.getImageData(0, 0, w, h).data;
-      const lum = new Float32Array(w * h);
-      for (let i = 0, p = 0; i < lum.length; i++, p += 4) {
-        lum[i] = 0.299 * px[p] + 0.587 * px[p + 1] + 0.114 * px[p + 2];
+      clearTimeout(timer);
+      try {
+        const w = img.naturalWidth, h = img.naturalHeight;
+        if (w < 3 || h < 3) { done(null); return; }
+        const cv = document.createElement("canvas");
+        cv.width = w; cv.height = h;
+        const ctx = cv.getContext("2d", { willReadFrequently: true });
+        if (!ctx) { done(null); return; }
+        ctx.drawImage(img, 0, 0);
+        const px = ctx.getImageData(0, 0, w, h).data;
+        const lum = new Float32Array(w * h);
+        for (let i = 0, p = 0; i < lum.length; i++, p += 4) {
+          lum[i] = 0.299 * px[p] + 0.587 * px[p + 1] + 0.114 * px[p + 2];
+        }
+        done({ data: lum, w, h });
+      } catch {
+        done(null);
       }
-      resolve({ data: lum, w, h });
     };
-    img.onerror = () => resolve(null);
+    img.onerror = () => { clearTimeout(timer); done(null); };
     img.src = `data:image/jpeg;base64,${base64}`;
   });
 }
@@ -177,26 +188,33 @@ export async function refineAnalysisBboxes(
   analysis: Analysis6
 ): Promise<Analysis6> {
   if (typeof document === "undefined") return analysis;
+  try {
+    const lums: Partial<Record<SurfaceId, Lum | null>> = {};
+    await Promise.all(
+      SURFACES.map(async (s) => {
+        try { lums[s] = await loadLuminance(surfaceImages[s]); }
+        catch { lums[s] = null; }
+      })
+    );
 
-  const lums: Partial<Record<SurfaceId, Lum | null>> = {};
-  await Promise.all(
-    SURFACES.map(async (s) => { lums[s] = await loadLuminance(surfaceImages[s]); })
-  );
+    const surfaces = { ...analysis.surfaces };
+    for (const s of SURFACES) {
+      const lum = lums[s];
+      const knots = analysis.surfaces[s];
+      if (!lum || !knots?.length) continue;
+      surfaces[s] = knots.map((k) => {
+        try {
+          const refined = refineOne(lum, k.bbox as [number, number, number, number]);
+          return refined ? { ...k, bbox: refined } : k;
+        } catch {
+          return k;
+        }
+      });
+    }
 
-  const surfaces = { ...analysis.surfaces };
-  for (const s of SURFACES) {
-    const lum = lums[s];
-    const knots = analysis.surfaces[s];
-    if (!lum || !knots?.length) continue;
-    surfaces[s] = knots.map((k) => {
-      try {
-        const refined = refineOne(lum, k.bbox as [number, number, number, number]);
-        return refined ? { ...k, bbox: refined } : k;
-      } catch {
-        return k;
-      }
-    });
+    return { ...analysis, surfaces };
+  } catch {
+    // Never let refinement break the analysis flow — fall back to raw boxes.
+    return analysis;
   }
-
-  return { ...analysis, surfaces };
 }
