@@ -112,7 +112,7 @@ const GEMINI_RESPONSE_SCHEMA: Schema = {
 
 export async function analyzeBoard(frontB64: string, backB64: string) {
   const response = await ai.models.generateContent({
-    model: "gemini-3.5-flash",
+    model: "gemini-2.0-flash",
     contents: [
       { text: PROMPT },
       { text: "FRONT FACE:" },
