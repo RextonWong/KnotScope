@@ -131,11 +131,11 @@ export function SurfaceGallery({
             <path
               key={i}
               d={`M ${l.x1} ${l.y1} Q ${cx} ${cy} ${l.x2} ${l.y2}`}
-              stroke={l.selected ? "#f59e0b" : l.kind === "arris" ? "#60a5fa" : "#d97706"}
-              strokeWidth={l.selected ? 2.5 : 1.5}
+              stroke={l.selected ? "#fbbf24" : l.kind === "arris" ? "#60a5fa" : "#f59e0b"}
+              strokeWidth={l.selected ? 4 : l.kind === "arris" ? 2.5 : 3}
               fill="none"
-              strokeDasharray={l.kind === "arris" ? "4 3" : "6 4"}
-              opacity={l.selected ? 1 : 0.55}
+              strokeDasharray={l.kind === "arris" ? "5 4" : "8 4"}
+              opacity={l.selected ? 1 : 0.85}
               strokeLinecap="round"
             />
           );

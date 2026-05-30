@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Zap, ChevronRight, Layers, Pencil } from "lucide-react";
 import { SAMPLE_PRESETS, DIAGRAM_ROWS } from "@/lib/samples";
+import { Plank3D } from "@/components/editor/Plank3D";
 import type { SurfaceId } from "@/lib/plank";
 import { SURFACE_IDS } from "@/lib/plank";
 
@@ -239,6 +240,24 @@ function DetailPanel({ presetId, onAnalyze, analyzing }: DetailPanelProps) {
           <h3 className="font-bold text-neutral-100">{preset.label}</h3>
           <p className="text-sm text-neutral-400 leading-relaxed mt-0.5">{preset.description}</p>
         </div>
+      </div>
+
+      {/* 3D preview of the sample knot placement */}
+      <div className="px-5 pb-2 pt-4 flex flex-col gap-2">
+        <p className="text-xs uppercase tracking-widest text-neutral-600">3D model</p>
+        <div
+          className="w-full overflow-hidden border border-neutral-800 bg-neutral-950"
+          style={{ height: 180 }}
+        >
+          <Plank3D
+            dimensions={preset.project.dimensions}
+            knots={preset.project.knots}
+            selectedKnotId={null}
+            onAddKnot={() => {}}
+            onSelectKnot={() => {}}
+          />
+        </div>
+        <p className="text-[10px] text-neutral-600">Drag to rotate. Knot positions match the rendered images below.</p>
       </div>
 
       {/* 6 surface images */}
