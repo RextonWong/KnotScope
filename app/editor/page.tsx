@@ -31,6 +31,7 @@ import {
 import { SAMPLE_PRESETS } from "@/lib/samples";
 import type { Analysis6 } from "@/lib/schema";
 import { renderAllSurfaces } from "@/lib/renderSurface";
+import { refineAnalysisBboxes } from "@/lib/refineBbox";
 import { GradeCard } from "@/components/GradeCard";
 import { LoadingState } from "@/components/LoadingState";
 import { KnotInspector } from "@/components/editor/KnotInspector";
@@ -172,7 +173,7 @@ function EditorPageInner() {
         const err = data as { error?: string };
         throw new Error(err.error ?? "Analysis failed");
       }
-      const result = data as Analysis6;
+      const result = await refineAnalysisBboxes(surfaceImages, data as Analysis6);
       setAnalysis(result);
       boardIdRef.current = `plank-${Date.now()}`;
       setPhase("results");

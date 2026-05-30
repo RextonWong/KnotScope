@@ -24,6 +24,7 @@ import type { SurfaceId } from "@/lib/plank";
 import { SURFACE_IDS } from "@/lib/plank";
 import { HistoryPanel } from "@/components/HistoryPanel";
 import { generateThumbnail, saveRecord, exportRecordJson, type HistoryRecord } from "@/lib/history";
+import { refineAnalysisBboxes } from "@/lib/refineBbox";
 
 type AppState = "empty" | "loading" | "results";
 type UploadMode = "2face" | "6face";
@@ -198,7 +199,7 @@ export default function Home() {
       });
       const data = await res.json() as unknown;
       if (!res.ok) throw new Error((data as { error?: string }).error ?? "Analysis failed");
-      const result = data as Analysis6;
+      const result = await refineAnalysisBboxes(surfaces, data as Analysis6);
       setAnalysis6(result);
       setState6("results");
       toast.success(
@@ -289,9 +290,10 @@ export default function Home() {
       });
       const data = await res.json() as unknown;
       if (!res.ok) throw new Error((data as { error?: string }).error ?? "Analysis failed");
-      setAnalysis6(data as Analysis6);
+      const result = await refineAnalysisBboxes(images6Upload as Record<SurfaceId, string>, data as Analysis6);
+      setAnalysis6(result);
       setState6("results");
-      toast.success(`Grade ${(data as Analysis6).estimated_grade} — ${(data as Analysis6).total_knots} knots found.`, { duration: 5000 });
+      toast.success(`Grade ${result.estimated_grade} — ${result.total_knots} knots found.`, { duration: 5000 });
     } catch (err) {
       toast.error(`Analysis failed: ${err instanceof Error ? err.message : "Unknown error"}`);
       setState6("empty");
