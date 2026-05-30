@@ -94,11 +94,13 @@ function CylEdge({
     new THREE.Vector3(0, 1, 0), dir.divideScalar(len)
   );
   return (
-    <mesh position={[mid.x, mid.y, mid.z]} quaternion={quat}>
+    <mesh position={[mid.x, mid.y, mid.z]} quaternion={quat} renderOrder={3}>
       <cylinderGeometry args={[radius, radius, len, 6, 1]} />
       <meshBasicMaterial
         color={color}
-        transparent={opacity < 1} opacity={opacity}
+        transparent opacity={opacity}
+        depthTest={false}
+        depthWrite={false}
         clippingPlanes={clippingPlanes}
       />
     </mesh>
@@ -135,9 +137,15 @@ function KnotBbox3D({
       <mesh
         position={[data.center.x, data.center.y, data.center.z]}
         onClick={(e) => { e.stopPropagation(); onSelect?.(); }}
+        renderOrder={3}
       >
         <sphereGeometry args={[selected ? 0.065 : 0.045, 12, 12]} />
-        <meshBasicMaterial color={col} clippingPlanes={clippingPlanes} />
+        <meshBasicMaterial
+          color={col}
+          transparent opacity={1}
+          depthTest={false} depthWrite={false}
+          clippingPlanes={clippingPlanes}
+        />
       </mesh>
     </>
   );
