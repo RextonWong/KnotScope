@@ -79,75 +79,64 @@ function FaceTexturedPlane({ face, image }: { face: FaceMeta; image: string }) {
 
 // ── Cylinder edge (thick, clippable) ─────────────────────────────────────────
 
-function CylEdge({
-  a, b, radius, color, opacity = 1, clippingPlanes,
+// ── Flat bounding-box outline that lies on the surface plane ──────────────────
+// Rendered in the face's local 2D frame so it sits flush on the wood. Uses
+// normal depth testing so the plank naturally occludes boxes on hidden faces
+// (looks painted on the surface rather than floating in 3D).
+
+function FlatBbox({
+  face, bbox, color, selected, onSelect,
 }: {
-  a: THREE.Vector3; b: THREE.Vector3;
-  radius: number; color: string; opacity?: number;
-  clippingPlanes?: THREE.Plane[];
-}) {
-  const dir = b.clone().sub(a);
-  const len = dir.length();
-  if (len < 1e-4) return null;
-  const mid = a.clone().add(b).multiplyScalar(0.5);
-  const quat = new THREE.Quaternion().setFromUnitVectors(
-    new THREE.Vector3(0, 1, 0), dir.divideScalar(len)
-  );
-  return (
-    <mesh position={[mid.x, mid.y, mid.z]} quaternion={quat} renderOrder={3}>
-      <cylinderGeometry args={[radius, radius, len, 6, 1]} />
-      <meshBasicMaterial
-        color={color}
-        transparent opacity={opacity}
-        depthTest={false}
-        depthWrite={false}
-        clippingPlanes={clippingPlanes}
-      />
-    </mesh>
-  );
-}
-
-// ── Bounding-box outline on a surface face ────────────────────────────────────
-
-interface KnotBboxData {
-  center: THREE.Vector3;
-  corners: [THREE.Vector3, THREE.Vector3, THREE.Vector3, THREE.Vector3];
+  face: FaceMeta;
+  bbox: [number, number, number, number];
   color: string;
-}
-
-function KnotBbox3D({
-  data, selected, onSelect, clippingPlanes,
-}: {
-  data: KnotBboxData; selected: boolean;
+  selected: boolean;
   onSelect?: () => void;
-  clippingPlanes?: THREE.Plane[];
 }) {
-  const [c0, c1, c2, c3] = data.corners;
-  const thickness = selected ? 0.220 : 0.150;
-  const col = selected ? "#fbbf24" : data.color;
-  const edges: [THREE.Vector3, THREE.Vector3][] = [
-    [c0, c1], [c1, c2], [c2, c3], [c3, c0],
-  ];
+  const [ymin, xmin, ymax, xmax] = bbox;
+  const w = face.width, h = face.height;
+  // Local plane coords: x across the face (u), y down the face (v).
+  const lx = (u: number) => (u - 0.5) * w;
+  const ly = (v: number) => (0.5 - v) * h;
+  const x0 = lx(xmin / 1000), x1 = lx(xmax / 1000);
+  const yTop = ly(ymin / 1000), yBot = ly(ymax / 1000);
+  const cx = (x0 + x1) / 2, cy = (yTop + yBot) / 2;
+  const rw = Math.abs(x1 - x0), rh = Math.abs(yTop - yBot);
+
+  const t = selected ? 0.07 : 0.045; // outline bar thickness (world units)
+  const eps = 0.012;                 // tiny lift off the surface to avoid z-fight
+  const col = selected ? "#fbbf24" : color;
+
   return (
-    <>
-      {edges.map(([a, b], i) => (
-        <CylEdge key={i} a={a} b={b} radius={thickness} color={col} clippingPlanes={clippingPlanes} />
-      ))}
-      {/* Clickable centre — fires onSelect so 3D and 2D gallery stay in sync */}
-      <mesh
-        position={[data.center.x, data.center.y, data.center.z]}
-        onClick={(e) => { e.stopPropagation(); onSelect?.(); }}
-        renderOrder={3}
-      >
-        <sphereGeometry args={[selected ? 0.065 : 0.045, 12, 12]} />
+    <group position={face.position} rotation={face.rotation as [number, number, number]}>
+      {/* Transparent fill — clickable hit area for selection */}
+      <mesh position={[cx, cy, eps]} onClick={(e) => { e.stopPropagation(); onSelect?.(); }}>
+        <planeGeometry args={[Math.max(rw, 0.01), Math.max(rh, 0.01)]} />
         <meshBasicMaterial
           color={col}
-          transparent opacity={1}
-          depthTest={false} depthWrite={false}
-          clippingPlanes={clippingPlanes}
+          transparent opacity={selected ? 0.22 : 0.10}
+          side={THREE.DoubleSide}
+          depthWrite={false}
         />
       </mesh>
-    </>
+      {/* Four outline bars */}
+      <mesh position={[cx, yTop, eps]}>
+        <planeGeometry args={[rw + t, t]} />
+        <meshBasicMaterial color={col} side={THREE.DoubleSide} />
+      </mesh>
+      <mesh position={[cx, yBot, eps]}>
+        <planeGeometry args={[rw + t, t]} />
+        <meshBasicMaterial color={col} side={THREE.DoubleSide} />
+      </mesh>
+      <mesh position={[x0, cy, eps]}>
+        <planeGeometry args={[t, rh]} />
+        <meshBasicMaterial color={col} side={THREE.DoubleSide} />
+      </mesh>
+      <mesh position={[x1, cy, eps]}>
+        <planeGeometry args={[t, rh]} />
+        <meshBasicMaterial color={col} side={THREE.DoubleSide} />
+      </mesh>
+    </group>
   );
 }
 
@@ -220,41 +209,17 @@ export function ResultPlank3D({
 }: ResultPlank3DProps) {
   const faces = useMemo(() => buildFaces(dimensions), [dimensions]);
 
-  // 6 clipping planes — keep bbox geometry inside the plank volume so
-  // edge knots don't pop out beyond the wood surface.
-  const clippingPlanes = useMemo(() => {
-    const L = (dimensions.length_mm * MM_TO_WORLD) / 2;
-    const W = (dimensions.width_mm  * MM_TO_WORLD) / 2;
-    const T = (dimensions.thickness_mm * MM_TO_WORLD) / 2;
-    const E = BBOX_OFFSET + 0.005;
-    return [
-      new THREE.Plane(new THREE.Vector3(-1, 0, 0), L + E),
-      new THREE.Plane(new THREE.Vector3( 1, 0, 0), L + E),
-      new THREE.Plane(new THREE.Vector3( 0,-1, 0), W + E),
-      new THREE.Plane(new THREE.Vector3( 0, 1, 0), W + E),
-      new THREE.Plane(new THREE.Vector3( 0, 0,-1), T + E),
-      new THREE.Plane(new THREE.Vector3( 0, 0, 1), T + E),
-    ];
-  }, [dimensions]);
-
-  const knotData = useMemo(() => {
-    const out: Record<string, KnotBboxData> = {};
+  // World-space centre of each knot — used to anchor the pair tubes.
+  const centers = useMemo(() => {
+    const out: Record<string, THREE.Vector3> = {};
     (Object.keys(faces) as SurfaceId[]).forEach((s) => {
       const face = faces[s];
       const n = face.outNormal.clone().multiplyScalar(BBOX_OFFSET);
       for (const k of analysis.surfaces[s]) {
         const [ymin, xmin, ymax, xmax] = k.bbox;
-        const wv = (u: number, v: number) => face.worldFromUv(u, v).add(n);
-        out[`${s}:${k.id}`] = {
-          center:  wv((xmin + xmax) / 2000, (ymin + ymax) / 2000),
-          corners: [
-            wv(xmin / 1000, ymin / 1000),
-            wv(xmax / 1000, ymin / 1000),
-            wv(xmax / 1000, ymax / 1000),
-            wv(xmin / 1000, ymax / 1000),
-          ],
-          color: KNOT_COLORS[k.type] ?? "#10b981",
-        };
+        out[`${s}:${k.id}`] = face
+          .worldFromUv((xmin + xmax) / 2000, (ymin + ymax) / 2000)
+          .add(n);
       }
     });
     return out;
@@ -265,7 +230,7 @@ export function ResultPlank3D({
       <Canvas
         camera={{ position: [6, 4, 8], fov: 45 }}
         dpr={[1, 2]}
-        gl={{ antialias: true, localClippingEnabled: true }}
+        gl={{ antialias: true }}
         onPointerMissed={() => onSelectKnot?.(null)}
       >
         <color attach="background" args={["#0a0a0a"]} />
@@ -278,19 +243,18 @@ export function ResultPlank3D({
             <FaceTexturedPlane key={s} face={faces[s]} image={surfaceImages[s]} />
           ))}
 
-          {/* Bounding-box outlines, clipped to plank bounds */}
+          {/* Flat bbox outlines lying on each surface */}
           {(Object.keys(faces) as SurfaceId[]).flatMap((s) =>
             analysis.surfaces[s].map((k) => {
-              const data = knotData[`${s}:${k.id}`];
-              if (!data) return null;
               const selected = selectedKnot?.surface === s && selectedKnot.id === k.id;
               return (
-                <KnotBbox3D
+                <FlatBbox
                   key={`${s}-${k.id}`}
-                  data={data}
+                  face={faces[s]}
+                  bbox={k.bbox as [number, number, number, number]}
+                  color={KNOT_COLORS[k.type] ?? "#10b981"}
                   selected={selected}
                   onSelect={() => onSelectKnot?.({ surface: s, id: k.id })}
-                  clippingPlanes={clippingPlanes}
                 />
               );
             })
@@ -298,8 +262,8 @@ export function ResultPlank3D({
 
           {/* Pair tubes — depthTest:false so they always show through the wood */}
           {analysis.pairs.map((p, i) => {
-            const a = knotData[`${p.a.surface}:${p.a.id}`]?.center;
-            const b = knotData[`${p.b.surface}:${p.b.id}`]?.center;
+            const a = centers[`${p.a.surface}:${p.a.id}`];
+            const b = centers[`${p.b.surface}:${p.b.id}`];
             if (!a || !b) return null;
             const sel =
               (selectedKnot?.surface === p.a.surface && selectedKnot.id === p.a.id) ||
