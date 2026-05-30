@@ -121,7 +121,7 @@ function KnotBbox3D({
   clippingPlanes?: THREE.Plane[];
 }) {
   const [c0, c1, c2, c3] = data.corners;
-  const thickness = selected ? 0.110 : 0.070;
+  const thickness = selected ? 0.220 : 0.150;
   const col = selected ? "#fbbf24" : data.color;
   const edges: [THREE.Vector3, THREE.Vector3][] = [
     [c0, c1], [c1, c2], [c2, c3], [c3, c0],
