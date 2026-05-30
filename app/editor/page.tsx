@@ -173,7 +173,7 @@ function EditorPageInner() {
         const err = data as { error?: string };
         throw new Error(err.error ?? "Analysis failed");
       }
-      const result = await refineAnalysisBboxes(surfaceImages, data as Analysis6);
+      const result = refineAnalysisBboxes(data as Analysis6, dimensions, knots);
       setAnalysis(result);
       boardIdRef.current = `plank-${Date.now()}`;
       setPhase("results");

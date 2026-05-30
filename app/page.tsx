@@ -25,6 +25,7 @@ import { SURFACE_IDS } from "@/lib/plank";
 import { HistoryPanel } from "@/components/HistoryPanel";
 import { generateThumbnail, saveRecord, exportRecordJson, type HistoryRecord } from "@/lib/history";
 import { refineAnalysisBboxes } from "@/lib/refineBbox";
+import { SAMPLE_PRESETS } from "@/lib/samples";
 
 type AppState = "empty" | "loading" | "results";
 type UploadMode = "2face" | "6face";
@@ -199,7 +200,12 @@ export default function Home() {
       });
       const data = await res.json() as unknown;
       if (!res.ok) throw new Error((data as { error?: string }).error ?? "Analysis failed");
-      const result = await refineAnalysisBboxes(surfaces, data as Analysis6);
+      const preset = SAMPLE_PRESETS.find((p) => p.id === presetId);
+      const result = refineAnalysisBboxes(
+        data as Analysis6,
+        { length_mm: 2400, width_mm: 150, thickness_mm: 25 },
+        preset?.project.knots
+      );
       setAnalysis6(result);
       setState6("results");
       toast.success(
@@ -290,7 +296,8 @@ export default function Home() {
       });
       const data = await res.json() as unknown;
       if (!res.ok) throw new Error((data as { error?: string }).error ?? "Analysis failed");
-      const result = await refineAnalysisBboxes(images6Upload as Record<SurfaceId, string>, data as Analysis6);
+      // Uploads are real photos (no authored geometry) — boxes used as-is.
+      const result = data as Analysis6;
       setAnalysis6(result);
       setState6("results");
       toast.success(`Grade ${result.estimated_grade} — ${result.total_knots} knots found.`, { duration: 5000 });
