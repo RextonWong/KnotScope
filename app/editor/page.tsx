@@ -525,6 +525,7 @@ function EditorPageInner() {
                 dimensions={dimensions}
                 surfaceImages={surfaceImages}
                 selectedKnot={resultSelected}
+                onSelectKnot={setResultSelected}
               />
             </div>
 

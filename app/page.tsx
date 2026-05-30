@@ -10,6 +10,12 @@ import { LoadingState } from "@/components/LoadingState";
 import { KnotTypeDiagram } from "@/components/KnotTypeDiagram";
 import { SurfaceGallery } from "@/components/editor/SurfaceGallery";
 import { DetailedAnalysisPanel } from "@/components/editor/DetailedAnalysisPanel";
+import dynamic from "next/dynamic";
+
+const ResultPlank3D = dynamic(
+  () => import("@/components/editor/ResultPlank3D").then((m) => m.ResultPlank3D),
+  { ssr: false, loading: () => <div className="w-full h-full bg-neutral-950 flex items-center justify-center text-xs text-neutral-600">Loading 3D…</div> }
+);
 import { bboxCenter } from "@/lib/bbox";
 import { TreePine, Zap, RotateCcw, Download, PanelRight, History, FileJson, Boxes, Upload, Layers } from "lucide-react";
 import Link from "next/link";
@@ -393,6 +399,21 @@ export default function Home() {
                 <GradeCard analysis={analysis6 as unknown as Analysis} />
               </div>
             </div>
+
+            {/* 3D result view */}
+            <div className="rounded-2xl border border-neutral-800 overflow-hidden bg-neutral-950" style={{ height: "52vh", minHeight: 360 }}>
+              <ResultPlank3D
+                analysis={analysis6}
+                dimensions={{ length_mm: 2400, width_mm: 150, thickness_mm: 25 }}
+                surfaceImages={diagImages}
+                selectedKnot={selected6}
+                onSelectKnot={setSelected6}
+              />
+            </div>
+            <p className="text-xs text-neutral-500 -mt-4 text-center">
+              Drag to rotate · Click a box to select a knot · Orange boxes = detected knots · Orange tubes = through-knot pairs
+            </p>
+
             <SurfaceGallery
               dimensions={{ length_mm: 2400, width_mm: 150, thickness_mm: 25 }}
               surfaceImages={diagImages}
