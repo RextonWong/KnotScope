@@ -331,16 +331,23 @@ interface TunnelExitMarkerProps {
   info: TunnelInfo;
   selected: boolean;
   onSelect: () => void;
+  clippingPlanes?: THREE.Plane[];
 }
 
-function TunnelExitMarker({ info, selected, onSelect }: TunnelExitMarkerProps) {
-  if (!info.exitFace || !info.exitUv) return null;
+function TunnelExitMarker({ info, selected, onSelect, clippingPlanes }: TunnelExitMarkerProps) {
   const face = info.exitFace;
-  const { lx, ly } = face.localFromUv(info.exitUv.u, info.exitUv.v);
   const r = info.toRadius;
   const ar = Math.max(0.3, Math.min(3, info.knot.aspect_ratio || 1));
   const rx = r * (ar >= 1 ? ar : 1);
   const ry = r * (ar >= 1 ? 1 : 1 / ar);
+  // Same shape as the entry knot so a tunnel matches on both faces by default.
+  const geometry = useMemo(
+    () => new THREE.ShapeGeometry(makeKnotShape(info.knot.shape, rx, ry, hashString(info.knot.id)), 24),
+    [info.knot.shape, info.knot.id, rx, ry]
+  );
+  const ringR = Math.max(rx, ry) * 1.3;
+  if (!face || !info.exitUv) return null;
+  const { lx, ly } = face.localFromUv(info.exitUv.u, info.exitUv.v);
   return (
     <group position={face.position} rotation={face.rotation}>
       <group
@@ -348,19 +355,22 @@ function TunnelExitMarker({ info, selected, onSelect }: TunnelExitMarkerProps) {
         rotation={[0, 0, (info.knot.rotation_deg * Math.PI) / 180]}
       >
         <mesh
+          geometry={geometry}
           onClick={(e) => {
             e.stopPropagation();
             onSelect();
           }}
-          scale={[rx, ry, 1]}
         >
-          <circleGeometry args={[1, 32]} />
-          <meshBasicMaterial color={knotColor(info.knot)} />
+          <meshBasicMaterial
+            color={knotColor(info.knot)}
+            side={THREE.DoubleSide}
+            clippingPlanes={clippingPlanes}
+          />
         </mesh>
         {selected && (
-          <mesh scale={[rx * 1.25, ry * 1.25, 1]} position={[0, 0, 0.001]}>
+          <mesh scale={[ringR, ringR, 1]} position={[0, 0, 0.001]}>
             <ringGeometry args={[0.85, 1, 48]} />
-            <meshBasicMaterial color="#f59e0b" />
+            <meshBasicMaterial color="#f59e0b" clippingPlanes={clippingPlanes} />
           </mesh>
         )}
       </group>
@@ -581,6 +591,7 @@ export function Plank3D(props: Plank3DProps) {
                   info={info}
                   selected={selected}
                   onSelect={() => props.onSelectKnot(info.knot.id)}
+                  clippingPlanes={clippingPlanes}
                 />
               </Fragment>
             );
