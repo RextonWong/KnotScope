@@ -396,9 +396,20 @@ function makeKnotShape(shape: KnotShape, rx: number, ry: number, seed: number): 
       sh.absellipse(0, 0, r, r, 0, Math.PI * 2, false, 0);
       break;
     }
-    case "oval":
-      sh.absellipse(0, 0, rx * 1.2, ry * 0.85, 0, Math.PI * 2, false, 0);
+    case "oval": {
+      // Egg / ovoid — asymmetric top/bottom, matching renderSurface.
+      const orx = rx * 1.1, ory = ry * 0.95;
+      const steps = 48;
+      for (let i = 0; i <= steps; i++) {
+        const t = (i / steps) * Math.PI * 2;
+        const taper = 1 + 0.28 * Math.cos(t);
+        const px = Math.sin(t) * orx * taper;
+        const py = Math.cos(t) * ory;
+        if (i === 0) sh.moveTo(px, py); else sh.lineTo(px, py);
+      }
+      sh.closePath();
       break;
+    }
     case "spike":
       sh.absellipse(0, 0, rx * 1.6, ry * 0.4, 0, Math.PI * 2, false, 0);
       break;

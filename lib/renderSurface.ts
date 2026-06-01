@@ -392,9 +392,19 @@ function buildShapePath(
           ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
           break;
         case "oval": {
-          // Slightly squashed teardrop
+          // Egg / ovoid — wider at one end, narrower at the other (not a
+          // symmetric ellipse). Width tapers as a function of position.
+          const orx = rx * 1.1, ory = ry * 0.95;
+          const steps = 48;
           ctx.beginPath();
-          ctx.ellipse(0, 0, rx * 1.2, ry * 0.85, 0, 0, Math.PI * 2);
+          for (let i = 0; i <= steps; i++) {
+            const t = (i / steps) * Math.PI * 2;
+            const taper = 1 + 0.28 * Math.cos(t); // 1.28 at top → 0.72 at bottom
+            const px = Math.sin(t) * orx * taper;
+            const py = Math.cos(t) * ory;
+            if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+          }
+          ctx.closePath();
           break;
         }
         case "spike": {

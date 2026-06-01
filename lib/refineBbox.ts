@@ -29,7 +29,7 @@ const clamp1000 = (v: number) => Math.max(0, Math.min(1000, v));
 function shapeSemiAxes(shape: KnotShape, rx: number, ry: number): [number, number] {
   switch (shape) {
     case "spike":     return [rx * 1.6, ry * 0.4];
-    case "oval":      return [rx * 1.2, ry * 0.85];
+    case "oval":      return [rx * 1.2, ry * 0.95];
     case "circle":  { const m = Math.max(rx, ry); return [m, m]; }
     case "irregular": return [rx * 1.1, ry * 1.1];
     default:          return [rx, ry]; // ellipse
