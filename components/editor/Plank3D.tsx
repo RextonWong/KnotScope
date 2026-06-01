@@ -6,6 +6,7 @@ import { Fragment, Suspense, useMemo, useRef, useEffect } from "react";
 import * as THREE from "three";
 import type {
   EditableKnot,
+  KnotShape,
   PlankDimensions,
   SurfaceId,
 } from "@/lib/plank";
@@ -125,6 +126,7 @@ interface FacePlaneProps {
   onAddKnot: (surface: SurfaceId, u: number, v: number) => void;
   onSelectKnot: (id: string | null) => void;
   onSelectSurface?: (surface: SurfaceId) => void;
+  clippingPlanes?: THREE.Plane[];
 }
 
 function FacePlane({
@@ -135,6 +137,7 @@ function FacePlane({
   onAddKnot,
   onSelectKnot,
   onSelectSurface,
+  clippingPlanes,
 }: FacePlaneProps) {
   const mineKnots = knots.filter((k) => k.surface === face.id);
   const size = getSurfaceSize(face.id, dimensions);
@@ -194,6 +197,7 @@ function FacePlane({
             knot={k}
             selected={selected}
             onSelect={() => onSelectKnot(k.id)}
+            clippingPlanes={clippingPlanes}
           />
         );
       })}
@@ -364,6 +368,59 @@ function TunnelExitMarker({ info, selected, onSelect }: TunnelExitMarkerProps) {
   );
 }
 
+// Deterministic RNG + hash so the "irregular" outline is stable per knot.
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function hashString(s: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = (h * 16777619) >>> 0; }
+  return h >>> 0;
+}
+
+// Build a 2D outline matching renderSurface.ts buildShapePath so the 3D marker
+// looks like the knot that will actually be rendered. rx/ry already include
+// the aspect ratio; the shape multipliers are applied here.
+function makeKnotShape(shape: KnotShape, rx: number, ry: number, seed: number): THREE.Shape {
+  const sh = new THREE.Shape();
+  switch (shape) {
+    case "circle": {
+      const r = Math.max(rx, ry);
+      sh.absellipse(0, 0, r, r, 0, Math.PI * 2, false, 0);
+      break;
+    }
+    case "oval":
+      sh.absellipse(0, 0, rx * 1.2, ry * 0.85, 0, Math.PI * 2, false, 0);
+      break;
+    case "spike":
+      sh.absellipse(0, 0, rx * 1.6, ry * 0.4, 0, Math.PI * 2, false, 0);
+      break;
+    case "irregular": {
+      const rng = mulberry32(seed);
+      const steps = 24;
+      for (let i = 0; i <= steps; i++) {
+        const a = (i / steps) * Math.PI * 2;
+        const wob = 0.78 + rng() * 0.42;
+        const px = Math.cos(a) * rx * wob;
+        const py = Math.sin(a) * ry * wob;
+        if (i === 0) sh.moveTo(px, py); else sh.lineTo(px, py);
+      }
+      sh.closePath();
+      break;
+    }
+    default: // ellipse
+      sh.absellipse(0, 0, rx, ry, 0, Math.PI * 2, false, 0);
+  }
+  return sh;
+}
+
 interface KnotMarkerProps {
   x: number;
   y: number;
@@ -371,30 +428,36 @@ interface KnotMarkerProps {
   knot: EditableKnot;
   selected: boolean;
   onSelect: () => void;
+  clippingPlanes?: THREE.Plane[];
 }
 
-function KnotMarker({ x, y, radius, knot, selected, onSelect }: KnotMarkerProps) {
-  const ringRef = useRef<THREE.Mesh>(null);
+function KnotMarker({ x, y, radius, knot, selected, onSelect, clippingPlanes }: KnotMarkerProps) {
   const ar = Math.max(0.3, Math.min(3, knot.aspect_ratio || 1));
   const rx = radius * (ar >= 1 ? ar : 1);
   const ry = radius * (ar >= 1 ? 1 : 1 / ar);
 
+  const geometry = useMemo(
+    () => new THREE.ShapeGeometry(makeKnotShape(knot.shape, rx, ry, hashString(knot.id)), 24),
+    [knot.shape, knot.id, rx, ry]
+  );
+  const ringR = Math.max(rx, ry) * 1.3;
+
   return (
     <group position={[x, y, 0.004]} rotation={[0, 0, (knot.rotation_deg * Math.PI) / 180]}>
       <mesh
-        onClick={(e) => {
-          e.stopPropagation();
-          onSelect();
-        }}
-        scale={[rx, ry, 1]}
+        geometry={geometry}
+        onClick={(e) => { e.stopPropagation(); onSelect(); }}
       >
-        <circleGeometry args={[1, 32]} />
-        <meshBasicMaterial color={knotColor(knot)} />
+        <meshBasicMaterial
+          color={knotColor(knot)}
+          side={THREE.DoubleSide}
+          clippingPlanes={clippingPlanes}
+        />
       </mesh>
       {selected && (
-        <mesh ref={ringRef} scale={[rx * 1.25, ry * 1.25, 1]} position={[0, 0, 0.001]}>
+        <mesh scale={[ringR, ringR, 1]} position={[0, 0, 0.001]}>
           <ringGeometry args={[0.85, 1, 48]} />
-          <meshBasicMaterial color="#f59e0b" />
+          <meshBasicMaterial color="#f59e0b" clippingPlanes={clippingPlanes} />
         </mesh>
       )}
     </group>
@@ -444,12 +507,26 @@ export function Plank3D(props: Plank3DProps) {
   const W = props.dimensions.width_mm * MM_TO_WORLD;
   const T = props.dimensions.thickness_mm * MM_TO_WORLD;
 
+  // Clip knot markers to the plank volume so parts placed past an edge don't
+  // float in empty space — only the portion on the wood surface shows.
+  const clippingPlanes = useMemo(() => {
+    const E = 0.02; // small tolerance so edge-aligned knots aren't over-clipped
+    return [
+      new THREE.Plane(new THREE.Vector3(-1, 0, 0), L / 2 + E),
+      new THREE.Plane(new THREE.Vector3( 1, 0, 0), L / 2 + E),
+      new THREE.Plane(new THREE.Vector3( 0,-1, 0), W / 2 + E),
+      new THREE.Plane(new THREE.Vector3( 0, 1, 0), W / 2 + E),
+      new THREE.Plane(new THREE.Vector3( 0, 0,-1), T / 2 + E),
+      new THREE.Plane(new THREE.Vector3( 0, 0, 1), T / 2 + E),
+    ];
+  }, [L, W, T]);
+
   return (
     <div className="w-full h-full bg-neutral-950">
       <Canvas
         camera={{ position: [6, 4, 8], fov: 45 }}
         dpr={[1, 2]}
-        gl={{ antialias: true }}
+        gl={{ antialias: true, localClippingEnabled: true }}
       >
         <color attach="background" args={["#0a0a0a"]} />
         <ambientLight intensity={0.7} />
@@ -479,6 +556,7 @@ export function Plank3D(props: Plank3DProps) {
               onAddKnot={props.onAddKnot}
               onSelectKnot={props.onSelectKnot}
               onSelectSurface={props.onSelectSurface}
+              clippingPlanes={clippingPlanes}
             />
           ))}
 
